@@ -83,7 +83,7 @@ constraints: any.Cabal ==3.8.1.0,
              any.integer-logarithms ==1.0.3.1,
              integer-logarithms -check-bounds +integer-gmp,
              any.json-spec ==0.2.1.1,
-             any.json-spec-elm ==0.1.0.1,
+             any.json-spec-elm ==0.2.0.0,
              any.mmorph ==1.2.0,
              any.mtl ==2.2.2,
              any.network-info ==0.2.1,
@@ -146,4 +146,4 @@ constraints: any.Cabal ==3.8.1.0,
              any.void ==0.7.3,
              void -safe,
              any.witherable ==0.4.2
-index-state: hackage.haskell.org 2023-09-02T18:33:26Z
+index-state: hackage.haskell.org 2023-09-04T21:10:10Z
