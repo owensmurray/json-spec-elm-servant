@@ -72,10 +72,22 @@ builtins =
               , (Name.Field "url", "Basics.String")
               , (Name.Field "body", "Http.Body")
               , ( Name.Field "decoder"
-                , "Json.Decode.Decoder" `Type.App` Type.Var (B 0)
+                , "Api.Req.Either"
+                    `Type.App` Type.Var (B 0)
+                    `Type.App` ("Json.Decode.Decoder" `Type.App` Type.Var (B 0))
                 )
               ]
         )
+    , Def.Type
+        "Api.Req.Either"
+        2
+        [ ( Name.Constructor "Left"
+          , [toScope (Type.Var (B 0))]
+          )
+        , ( Name.Constructor "Right"
+          , [toScope (Type.Var (B 1))]
+          )
+        ]
     , Def.Constant
         "Api.Req.task"
         1
@@ -147,21 +159,26 @@ builtins =
                                     [Pat.Var 0, Pat.Var 1]
                                     (
                                       Expr.Case
-                                        (
-                                          Expr.apps
-                                            "Json.Decode.decodeString"
-                                            [ F . F <$>
-                                                p req "decoder"
-                                            , patVar 1
-                                            ]
-                                        )
-                                        [ pat "Result.Err" [Pat.Var 0] $
-                                            "Result.Err"
-                                              <| "Http.BadBody"
-                                              <| "Json.Decode.errorToString"
-                                              <| patVar 0
-                                        , pat "Result.Ok" [Pat.Var 0] $
-                                            "Result.Ok" <| patVar 0
+                                        ( F . F <$> p req "decoder")
+                                        [ pat "Api.Req.Left" [Pat.Var 0] $
+                                            "Result.Ok" `Expr.App` patVar 0
+                                        , pat "Api.Req.Right" [Pat.Var 0] $ 
+                                            Expr.Case
+                                              (
+                                                Expr.apps
+                                                  "Json.Decode.decodeString"
+                                                  [ patVar 0
+                                                  , F <$> patVar 1
+                                                  ]
+                                              )
+                                              [ pat "Result.Err" [Pat.Var 0] $
+                                                  "Result.Err"
+                                                    <| "Http.BadBody"
+                                                    <| "Json.Decode.errorToString"
+                                                    <| patVar 0
+                                              , pat "Result.Ok" [Pat.Var 0] $
+                                                  "Result.Ok" <| patVar 0
+                                              ]
                                         ]
                                     )
                                 ]
@@ -212,7 +229,7 @@ instance {- Elmable (Verb method code types response) -}
             requestFunctionBody
               params
               (reflectMethod (Proxy @method))
-              decoder
+              ("Api.Req.Right" `Expr.App` decoder)
           )
       pure ()
 instance (ReflectMethod method) => Elmable (NoContentVerb method) where
@@ -226,7 +243,7 @@ instance (ReflectMethod method) => Elmable (NoContentVerb method) where
           requestFunctionBody
             params
             (reflectMethod (Proxy @method))
-            (g "Json.Decode.succeed" `Expr.App` "Basics.()")
+            ("Api.Req.Left" `Expr.App` "Basics.()")
         )
     pure ()
 
