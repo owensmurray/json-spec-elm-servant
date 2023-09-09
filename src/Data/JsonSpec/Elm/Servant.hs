@@ -15,7 +15,22 @@
 {-# LANGUAGE ViewPatterns #-}
 
 module Data.JsonSpec.Elm.Servant (
+  -- * Generating Elm Clients
   servantDefs,
+
+  -- * Extensions
+  {-|
+    The symbols in this section are mainly exposed in case you are using
+    some extensions to the standard servant types and need to build some
+    companion extensions to generate proper Elm types for them. For most
+    normal usage you will probably just use 'servantDefs'.
+  -}
+  Elmable(..),
+  IsParam(..),
+  Param(..),
+  PathParam(..),
+  HeaderParam(..),
+  QP(..),
 ) where
 
 
@@ -53,6 +68,14 @@ import qualified Language.Elm.Pattern as Pat
 import qualified Language.Elm.Type as Type
 
 
+{-|
+  This function will traverse the @api@ type, generating elm definitions for:
+  * Http requests for each endpoint, including encoders and decoders for
+    anonymous elm types.
+  * Named Elm types (i.e. Any 'Specification' that is bound to a name using
+    'JsonLet'
+  * Decoders and Encoders for named elm types.
+-}
 servantDefs :: forall api. (Elmable api) => Proxy api -> Set Definition
 servantDefs _ =
   builtins
