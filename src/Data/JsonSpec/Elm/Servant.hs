@@ -219,7 +219,7 @@ class Elmable e where
     Collect all the Elm definitions needed to implement a client for
     the API.  This is called recursively on our walk down the API tree,
     and the @['Param']@ argument contains all the request parameters
-    (like 'Capture', 'ReqBody', etc) that have been encountered so far on
+    (like 'Servant.API.Capture', 'Servant.API.ReqBody'', etc) that have been encountered so far on
     whatever particular branch . It will start out empty at the API root.
   -}
   endpoints :: [Param] -> Definitions ()
