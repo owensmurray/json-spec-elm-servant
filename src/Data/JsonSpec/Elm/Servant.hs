@@ -189,7 +189,6 @@ builtins =
     ]
 
 
-
 {-| Class of servant APIs for which Elm client code can be generated. -}
 class Elmable e where
   {-|
