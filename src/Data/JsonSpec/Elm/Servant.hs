@@ -42,7 +42,7 @@ import Prelude (Applicative(pure), Foldable(foldr, length), Maybe(Just,
   Nothing), Semigroup((<>)), ($), (.), (<$>), Eq, Int, error, reverse)
 import Servant.API (ReflectMethod(reflectMethod), (:<|>), (:>), Capture,
   Header', Headers, JSON, NamedRoutes, NoContent, NoContentVerb, Optional,
-  ReqBody', Required, ToServantApi, Verb)
+  QueryParam', ReqBody', Required, ToServantApi, Verb)
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as TE
@@ -299,6 +299,24 @@ instance {- IsParam (ReqBody' mods (other : accept) a) -}
     param = param @(ReqBody' mods accept a)
 instance (KnownSymbol segment) => IsParam (segment :: Symbol) where
   param = pure $ PathParam (Static (sym @segment))
+instance {- IsParam (QueryParam' (Optional : more) name typ) -}
+    (KnownSymbol name)
+  =>
+    IsParam (QueryParam' (Optional : more) name typ)
+  where
+    param = pure $ QueryParam (OptionalQP (sym @name))
+instance {- IsParam (QueryParam' (Required : more) name typ) -}
+    (KnownSymbol name)
+  =>
+    IsParam (QueryParam' (Required : more) name typ)
+  where
+    param = pure $ QueryParam (RequiredQP (sym @name))
+instance {- IsParam (QueryParam' (other : more) name typ) -}
+    {-# overlaps #-} (IsParam (QueryParam' more name typ))
+  =>
+    IsParam (QueryParam' (other : more) name typ)
+  where
+    param = param @(QueryParam' more name typ)
 
 
 requestFunctionName
@@ -346,6 +364,9 @@ requestFunctionType params responseType =
             (\case
               PathParam (Capture _) -> Just "Basics.String"
               PathParam (Static _) -> Nothing
+              QueryParam (RequiredQP _) -> Just "Basics.String"
+              QueryParam (OptionalQP _) ->
+                Just ("Basics.Maybe" `Type.App` "Basics.String")
               HeaderParam (RequiredHeader _) -> Just "Basics.String"
               HeaderParam (OptionalHeader _) ->
                 Just ("Basics.Maybe" `Type.App` "Basics.String")
@@ -412,7 +433,29 @@ requestFunctionBody params method decoder =
                 Capture _ -> Expr.Var param_
             | param_@(PathParam pp) <- params
             ]
-        , Expr.List []
+        , Expr.apps
+            "List.filterMap"
+            [ "Basics.identity"
+            , Expr.List
+                [ let
+                    name :: Text
+                    name  = case qp of { RequiredQP n -> n; OptionalQP n -> n}
+                        
+                    queryExpr :: Expression Param
+                    queryExpr =
+                      Expr.apps
+                        "Maybe.map"
+                        [ "Url.Builder.string" `Expr.App` Expr.String name
+                        , case qp of
+                            RequiredQP _ ->
+                              "Maybe.Just" `Expr.App` Expr.Var param_
+                            OptionalQP _ -> Expr.Var param_
+                        ]
+                  in
+                    queryExpr
+                | param_@(QueryParam qp) <- params
+                ]
+            ]
         ]
 
     body :: Expression Param
@@ -443,10 +486,17 @@ requestFunctionBody params method decoder =
 data Param
   = PathParam PathParam
   | HeaderParam HeaderParam
+  | QueryParam QP
   | BodyEncoder
       { elmType   :: Type Void
       , encoder :: Expression Void
       }
+  deriving stock (Eq)
+
+
+data QP
+  = RequiredQP Text
+  | OptionalQP Text
   deriving stock (Eq)
 
 
