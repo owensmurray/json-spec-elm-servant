@@ -4,6 +4,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
@@ -281,9 +282,9 @@ instance {- IsParam (ReqBody' (Required : mods) (JSON : accept) a) -}
     IsParam (ReqBody' (Required : mods) (JSON : accept) a)
   where
     param = do
-      typ <- typeOf @(DecodingSpec a)
+      elmType <- typeOf @(DecodingSpec a)
       encoder <- encoderOf @(DecodingSpec a)
-      pure $ BodyEncoder typ encoder
+      pure $ BodyEncoder {elmType, encoder}
 instance {- IsParam (ReqBody' (other : mods) (JSON : accept) a) -}
     {-# overlaps #-} (IsParam (ReqBody' mods '[JSON] a))
   =>
@@ -442,7 +443,10 @@ requestFunctionBody params method decoder =
 data Param
   = PathParam PathParam
   | HeaderParam HeaderParam
-  | BodyEncoder (Type Void) (Expression Void)
+  | BodyEncoder
+      { elmType   :: Type Void
+      , encoder :: Expression Void
+      }
   deriving stock (Eq)
 
 
