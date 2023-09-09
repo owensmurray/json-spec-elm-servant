@@ -189,7 +189,16 @@ builtins =
     ]
 
 
+
+{-| Class of servant APIs for which Elm client code can be generated. -}
 class Elmable e where
+  {-|
+    Collect all the Elm definitions needed to implement a client for
+    the API.  This is called recursively on our walk down the API tree,
+    and the @['Param']@ argument contains all the request parameters
+    (like 'Capture', 'ReqBody', etc) that have been encountered so far on
+    whatever particular branch . It will start out empty at the API root.
+  -}
   endpoints :: [Param] -> Definitions ()
 instance (Elmable a, Elmable b) => Elmable (a :<|> b) where
   endpoints params = do
@@ -248,6 +257,10 @@ instance (ReflectMethod method) => Elmable (NoContentVerb method) where
     pure ()
 
 
+{-|
+  Obtain a value-level request parameter type from the type-level servant
+  parameter type.
+-}
 class IsParam a where
   param :: Definitions Param
 instance (KnownSymbol name) => IsParam (Capture name tpy) where
