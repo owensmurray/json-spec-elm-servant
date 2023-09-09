@@ -162,7 +162,7 @@ builtins =
                                         ( F . F <$> p req "decoder")
                                         [ pat "Api.Req.Left" [Pat.Var 0] $
                                             "Result.Ok" `Expr.App` patVar 0
-                                        , pat "Api.Req.Right" [Pat.Var 0] $ 
+                                        , pat "Api.Req.Right" [Pat.Var 0] $
                                             Expr.Case
                                               (
                                                 Expr.apps
