@@ -62,9 +62,10 @@ import GHC.Generics (Generic)
 import Prelude (Applicative(pure), Either(Left, Right), Functor(fmap),
   Traversable(traverse), (.), (<$>), Eq, Int, Ord)
 import Servant.API (FromHttpApiData(parseHeader, parseQueryParam),
-  GenericMode((:-)), StdMethod(GET), (:>), Capture, DeleteNoContent, Get,
-  Header, Header', Headers, JSON, NamedRoutes, NoContent, Optional, Post,
-  PostNoContent, ReqBody, ReqBody', Required, Strict, ToHttpApiData, Verb)
+  GenericMode((:-)), StdMethod(GET), (:>), Capture, DeleteNoContent,
+  Get, Header, Header', Headers, JSON, NamedRoutes, NoContent, Optional,
+  Post, PostNoContent, QueryParam', ReqBody, ReqBody', Required, Strict,
+  ToHttpApiData, Verb)
 import Web.Cookie (SetCookie)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -117,6 +118,8 @@ data ProtectedApi mode = ProtectedApi
 
   , dashboard :: mode
       :- "dashboard"
+      :> QueryParam' '[Required, Strict] "foo" Text
+      :> QueryParam' '[Optional, Strict] "bar" Text
       :> Get '[JSON] DashboardData
 
   , addInvite :: mode

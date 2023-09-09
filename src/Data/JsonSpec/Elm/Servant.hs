@@ -4,6 +4,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
@@ -14,7 +15,22 @@
 {-# LANGUAGE ViewPatterns #-}
 
 module Data.JsonSpec.Elm.Servant (
+  -- * Generating Elm Clients
   servantDefs,
+
+  -- * Extensions
+  {-|
+    The symbols in this section are mainly exposed in case you are using
+    some extensions to the standard servant types and need to build some
+    companion extensions to generate proper Elm types for them. For most
+    normal usage you will probably just use 'servantDefs'.
+  -}
+  Elmable(..),
+  IsParam(..),
+  Param(..),
+  PathParam(..),
+  HeaderParam(..),
+  QP(..),
 ) where
 
 
@@ -41,7 +57,7 @@ import Prelude (Applicative(pure), Foldable(foldr, length), Maybe(Just,
   Nothing), Semigroup((<>)), ($), (.), (<$>), Eq, Int, error, reverse)
 import Servant.API (ReflectMethod(reflectMethod), (:<|>), (:>), Capture,
   Header', Headers, JSON, NamedRoutes, NoContent, NoContentVerb, Optional,
-  ReqBody', Required, ToServantApi, Verb)
+  QueryParam', ReqBody', Required, ToServantApi, Verb)
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as TE
@@ -52,6 +68,14 @@ import qualified Language.Elm.Pattern as Pat
 import qualified Language.Elm.Type as Type
 
 
+{-|
+  This function will traverse the @api@ type, generating elm definitions for:
+  * Http requests for each endpoint, including encoders and decoders for
+    anonymous elm types.
+  * Named Elm types (i.e. Any 'Specification' that is bound to a name using
+    'JsonLet'
+  * Decoders and Encoders for named elm types.
+-}
 servantDefs :: forall api. (Elmable api) => Proxy api -> Set Definition
 servantDefs _ =
   builtins
@@ -162,7 +186,7 @@ builtins =
                                         ( F . F <$> p req "decoder")
                                         [ pat "Api.Req.Left" [Pat.Var 0] $
                                             "Result.Ok" `Expr.App` patVar 0
-                                        , pat "Api.Req.Right" [Pat.Var 0] $ 
+                                        , pat "Api.Req.Right" [Pat.Var 0] $
                                             Expr.Case
                                               (
                                                 Expr.apps
@@ -189,7 +213,15 @@ builtins =
     ]
 
 
+{-| Class of servant APIs for which Elm client code can be generated. -}
 class Elmable e where
+  {-|
+    Collect all the Elm definitions needed to implement a client for
+    the API.  This is called recursively on our walk down the API tree,
+    and the @['Param']@ argument contains all the request parameters
+    (like 'Capture', 'ReqBody', etc) that have been encountered so far on
+    whatever particular branch . It will start out empty at the API root.
+  -}
   endpoints :: [Param] -> Definitions ()
 instance (Elmable a, Elmable b) => Elmable (a :<|> b) where
   endpoints params = do
@@ -248,6 +280,10 @@ instance (ReflectMethod method) => Elmable (NoContentVerb method) where
     pure ()
 
 
+{-|
+  Obtain a value-level request parameter type from the type-level servant
+  parameter type.
+-}
 class IsParam a where
   param :: Definitions Param
 instance (KnownSymbol name) => IsParam (Capture name tpy) where
@@ -268,9 +304,9 @@ instance {- IsParam (ReqBody' (Required : mods) (JSON : accept) a) -}
     IsParam (ReqBody' (Required : mods) (JSON : accept) a)
   where
     param = do
-      typ <- typeOf @(DecodingSpec a)
+      elmType <- typeOf @(DecodingSpec a)
       encoder <- encoderOf @(DecodingSpec a)
-      pure $ BodyEncoder typ encoder
+      pure $ BodyEncoder {elmType, encoder}
 instance {- IsParam (ReqBody' (other : mods) (JSON : accept) a) -}
     {-# overlaps #-} (IsParam (ReqBody' mods '[JSON] a))
   =>
@@ -285,6 +321,24 @@ instance {- IsParam (ReqBody' mods (other : accept) a) -}
     param = param @(ReqBody' mods accept a)
 instance (KnownSymbol segment) => IsParam (segment :: Symbol) where
   param = pure $ PathParam (Static (sym @segment))
+instance {- IsParam (QueryParam' (Optional : more) name typ) -}
+    (KnownSymbol name)
+  =>
+    IsParam (QueryParam' (Optional : more) name typ)
+  where
+    param = pure $ QueryParam (OptionalQP (sym @name))
+instance {- IsParam (QueryParam' (Required : more) name typ) -}
+    (KnownSymbol name)
+  =>
+    IsParam (QueryParam' (Required : more) name typ)
+  where
+    param = pure $ QueryParam (RequiredQP (sym @name))
+instance {- IsParam (QueryParam' (other : more) name typ) -}
+    {-# overlaps #-} (IsParam (QueryParam' more name typ))
+  =>
+    IsParam (QueryParam' (other : more) name typ)
+  where
+    param = param @(QueryParam' more name typ)
 
 
 requestFunctionName
@@ -332,6 +386,9 @@ requestFunctionType params responseType =
             (\case
               PathParam (Capture _) -> Just "Basics.String"
               PathParam (Static _) -> Nothing
+              QueryParam (RequiredQP _) -> Just "Basics.String"
+              QueryParam (OptionalQP _) ->
+                Just ("Basics.Maybe" `Type.App` "Basics.String")
               HeaderParam (RequiredHeader _) -> Just "Basics.String"
               HeaderParam (OptionalHeader _) ->
                 Just ("Basics.Maybe" `Type.App` "Basics.String")
@@ -398,7 +455,29 @@ requestFunctionBody params method decoder =
                 Capture _ -> Expr.Var param_
             | param_@(PathParam pp) <- params
             ]
-        , Expr.List []
+        , Expr.apps
+            "List.filterMap"
+            [ "Basics.identity"
+            , Expr.List
+                [ let
+                    name :: Text
+                    name  = case qp of { RequiredQP n -> n; OptionalQP n -> n}
+                        
+                    queryExpr :: Expression Param
+                    queryExpr =
+                      Expr.apps
+                        "Maybe.map"
+                        [ "Url.Builder.string" `Expr.App` Expr.String name
+                        , case qp of
+                            RequiredQP _ ->
+                              "Maybe.Just" `Expr.App` Expr.Var param_
+                            OptionalQP _ -> Expr.Var param_
+                        ]
+                  in
+                    queryExpr
+                | param_@(QueryParam qp) <- params
+                ]
+            ]
         ]
 
     body :: Expression Param
@@ -429,7 +508,17 @@ requestFunctionBody params method decoder =
 data Param
   = PathParam PathParam
   | HeaderParam HeaderParam
-  | BodyEncoder (Type Void) (Expression Void)
+  | QueryParam QP
+  | BodyEncoder
+      { elmType :: Type Void
+      , encoder :: Expression Void
+      }
+  deriving stock (Eq)
+
+
+data QP
+  = RequiredQP Text
+  | OptionalQP Text
   deriving stock (Eq)
 
 
