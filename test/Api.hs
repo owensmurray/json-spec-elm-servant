@@ -127,7 +127,7 @@ data ProtectedApi mode = ProtectedApi
       :- "proposal"
       :> Capture "proposalId" ProposalId
       :> "invites"
-      :> "add"
+      :> "add-invite"
       :> ReqBody' '[Required, Strict] '[JSON] Invite
       :> PostNoContent
 
