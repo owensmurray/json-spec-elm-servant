@@ -362,11 +362,19 @@ requestFunctionName params =
       Text.toTitle <$>
         mapMaybe
           (\case
-            PathParam (Static segment) -> Just segment
-            PathParam (Capture name) -> Just name
+            PathParam (Static segment) -> Just (munge segment)
+            PathParam (Capture name) -> Just (munge name)
             _ -> Nothing
           )
           params
+
+    {-
+      Try to generate valid names in the face of common api path
+      idioms. It isn't really worth it for this to be complete, but we
+      at least want to cover the basics
+    -}
+    munge :: Text -> Text
+    munge = Text.replace "-" "_"
 
 
 requestFunctionType

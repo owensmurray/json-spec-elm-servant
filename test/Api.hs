@@ -9,6 +9,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TypeAbstractions #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
@@ -126,7 +127,7 @@ data ProtectedApi mode = ProtectedApi
       :- "proposal"
       :> Capture "proposalId" ProposalId
       :> "invites"
-      :> "add"
+      :> "add-invite"
       :> ReqBody' '[Required, Strict] '[JSON] Invite
       :> PostNoContent
 
