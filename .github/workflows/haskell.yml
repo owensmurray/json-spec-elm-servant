@@ -27,6 +27,8 @@ jobs:
       - name: Configure the Build
         run: |
           rm cabal.project.freeze
+          # We can't run tests in this project because testing requires
+          # Elm to be installed.
           cabal configure
           cabal build --dry-run
 
@@ -108,6 +110,8 @@ jobs:
           EOF
           ) > cabal.project
           rm cabal.project.freeze
+          # We can't run tests in this project because testing requires
+          # Elm to be installed.
           cabal configure
           cabal build --dry-run
 
