@@ -4,3 +4,4 @@
 /.tags.lock
 /tags
 /elm-test
+*.full-imports
