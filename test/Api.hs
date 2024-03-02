@@ -14,6 +14,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE ViewPatterns #-}
 
 {- swiped from an incomplete personal project to use for testing. -}
 module Api (
@@ -49,10 +50,11 @@ module Api (
 import Data.Aeson (FromJSON, FromJSONKey, ToJSON, ToJSONKey)
 import Data.Binary (Binary)
 import Data.ByteString (ByteString)
-import Data.JsonSpec (Field(Field), HasJsonDecodingSpec(DecodingSpec,
-  fromJSONStructure), HasJsonEncodingSpec(EncodingSpec, toJSONStructure),
-  SpecJSON(SpecJSON), Specification(JsonArray, JsonDateTime, JsonEither,
-  JsonInt, JsonLet, JsonObject, JsonRef, JsonString, JsonTag), Tag(Tag))
+import Data.JsonSpec (Field(Field, unField),
+  HasJsonDecodingSpec(DecodingSpec, fromJSONStructure),
+  HasJsonEncodingSpec(EncodingSpec, toJSONStructure), SpecJSON(SpecJSON),
+  Specification(JsonArray, JsonDateTime, JsonEither, JsonInt, JsonLet,
+  JsonObject, JsonRef, JsonString, JsonTag), Tag(Tag))
 import Data.Map (Map)
 import Data.Set (Set)
 import Data.Text (Text)
@@ -61,13 +63,14 @@ import Data.Time (UTCTime)
 import Data.UUID (UUID)
 import GHC.Generics (Generic)
 import Prelude (Applicative(pure), Either(Left, Right), Functor(fmap),
-  Traversable(traverse), (.), (<$>), Eq, Int, Ord)
+  Traversable(traverse), (.), (<$>), Eq, Int, Maybe, Ord)
 import Servant.API (FromHttpApiData(parseHeader, parseQueryParam),
   GenericMode((:-)), StdMethod(GET), (:>), Capture, DeleteNoContent,
   Get, Header, Header', Headers, JSON, NamedRoutes, NoContent, Optional,
   Post, PostNoContent, QueryParam', ReqBody, ReqBody', Required, Strict,
   ToHttpApiData, Verb)
 import Web.Cookie (SetCookie)
+import qualified Data.JsonSpec as Spec
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.UUID as UUID
@@ -156,9 +159,9 @@ data SetMetadataReq = SetMetadataReq
 instance HasJsonDecodingSpec SetMetadataReq where
   type DecodingSpec SetMetadataReq =
     JsonObject
-      '[ '("name", DecodingSpec Name)
-       , '("description", JsonString)
-       , '("venue", JsonString)
+      '[        "name" ::: (DecodingSpec Name)
+       , "description" ::: JsonString
+       ,       "venue" ::: JsonString
        ]
   fromJSONStructure
       (Field @"name" name_,
@@ -186,16 +189,16 @@ instance HasJsonEncodingSpec DashboardData where
     JsonLet
       '[ '("DashboardData"
           , JsonObject
-              '[ '("proposals",
+              '[ "proposals" :::
                     JsonArray
-                      ( JsonObject
-                          '[ '("key", EncodingSpec ProposalId)
-                           , '("value", EncodingSpec Proposal)
+                      (
+                        JsonObject
+                          '[   "key" ::: EncodingSpec ProposalId
+                           , "value" ::: EncodingSpec Proposal
                            ]
                       )
-                  )
-               , '("credits", EncodingSpec AvailableCredits)
-               , '("user", EncodingSpec DiscordUser)
+               , "credits" ::: EncodingSpec AvailableCredits
+               , "user" ::: EncodingSpec DiscordUser
                ]
           )
        ]
@@ -226,13 +229,13 @@ data Proposal = Proposal
 instance HasJsonEncodingSpec Proposal where
   type EncodingSpec Proposal =
     JsonObject
-      '[ '("name", EncodingSpec Name)
-       , '("owner", EncodingSpec DiscordUser)
-       , '("availability", JsonArray (EncodingSpec AvailabilityInterval))
-       , '("description", JsonString)
-       , '("venue", JsonString)
-       , '("invites", JsonArray (EncodingSpec Invite))
-       , '("created-at", JsonDateTime)
+      '[         "name" ::: EncodingSpec Name
+       ,        "owner" ::: EncodingSpec DiscordUser
+       , "availability" ::: JsonArray (EncodingSpec AvailabilityInterval)
+       ,  "description" ::: JsonString
+       ,        "venue" ::: JsonString
+       ,      "invites" ::: JsonArray (EncodingSpec Invite)
+       ,   "created-at" ::: JsonDateTime
        ]
   toJSONStructure
       Proposal
@@ -290,13 +293,13 @@ instance HasJsonEncodingSpec Invite where
       '[ '( "Invite"
           , JsonEither
               ( JsonObject
-                  '[ '("type", JsonTag "discord-user")
-                   , '("username", EncodingSpec DiscordUser)
+                  '[     "type" ::: JsonTag "discord-user"
+                   , "username" ::: EncodingSpec DiscordUser
                    ]
               )
               ( JsonObject
-                  '[ '("type", JsonTag "discord-server")
-                   , '("guild", EncodingSpec Guild)
+                  '[  "type" ::: JsonTag "discord-server"
+                   , "guild" ::: EncodingSpec Guild
                    ]
               )
           )
@@ -340,8 +343,8 @@ data Guild = Guild
 instance HasJsonEncodingSpec Guild where
   type EncodingSpec Guild =
     JsonObject
-      '[ '("id", EncodingSpec GuildId)
-       , '("name", JsonString)
+      '[   "id" ::: EncodingSpec GuildId
+       , "name" ::: JsonString
        ]
   toJSONStructure Guild { guildId , name } =
     (Field @"id" (toJSONStructure guildId),
@@ -391,10 +394,10 @@ instance HasJsonDecodingSpec AvailabilityInterval where
           }
 instance HasJsonEncodingSpec AvailabilityInterval where
   type EncodingSpec AvailabilityInterval =
-    JsonObject '[
-      '("interval", EncodingSpec Interval),
-      '("users", JsonArray (EncodingSpec DiscordUser))
-    ]
+    JsonObject
+      '[ "interval" ::: EncodingSpec Interval
+       ,    "users" ::: JsonArray (EncodingSpec DiscordUser)
+       ]
   toJSONStructure AvailabilityInterval { interval , users } =
     (Field @"interval" (toJSONStructure interval),
     (Field @"users" (toJSONStructure <$> Set.toList users),
@@ -447,7 +450,7 @@ newtype FEConfig = FEConfig
 instance HasJsonEncodingSpec FEConfig where
   type EncodingSpec FEConfig =
     JsonObject
-      '[ '( "redirectUrl", JsonString) ]
+      '[ "redirectUrl" ::: JsonString ]
   toJSONStructure FEConfig { discordRedirect } =
     (Field @"redirectUrl" discordRedirect,
     ())
@@ -498,22 +501,22 @@ data NewProposalReq = NewProposalReq
   {         name :: Name
   , availability :: Availability
   ,  description :: Text
-  ,        venue :: Text
+  ,        venue :: Maybe Text
   }
   deriving (FromJSON) via (SpecJSON NewProposalReq)
 instance HasJsonDecodingSpec NewProposalReq where
   type DecodingSpec NewProposalReq =
     JsonObject
-      '[ '("name", DecodingSpec Name)
-       , '("availability", DecodingSpec Availability)
-       , '("description", JsonString)
-       , '("venue", JsonString)
+      '[         "name" ::: DecodingSpec Name
+       , "availability" ::: DecodingSpec Availability
+       ,  "description" ::: JsonString
+       ,        "venue" ::? JsonString
        ]
   fromJSONStructure
       (Field @"name" rawName,
       (Field @"availability" rawAvailability,
       (Field @"description" description,
-      (Field @"venue" venue,
+      (fmap (unField @"venue") -> venue,
       ()))))
     = do
       name <- fromJSONStructure rawName
@@ -558,10 +561,10 @@ data Interval = Interval
   deriving (ToJSON, FromJSON) via (SpecJSON Interval)
 instance HasJsonEncodingSpec Interval where
   type EncodingSpec Interval =
-    JsonObject '[
-      '("startInclusive", JsonDateTime),
-      '("endExclusive", JsonDateTime)
-    ]
+    JsonObject
+      '[ "startInclusive" ::: JsonDateTime
+       ,   "endExclusive" ::: JsonDateTime
+       ]
   toJSONStructure
       Interval
         { startInclusive
@@ -611,13 +614,17 @@ instance
   where
     type EncodingSpec (KV k v) =
       JsonObject
-        '[ '("key", EncodingSpec k)
-         , '("value", EncodingSpec v)
+        '[   "key" ::: EncodingSpec k
+         , "value" ::: EncodingSpec v
          ]
 
     toJSONStructure KV { key , value } =
       (Field @"key" (toJSONStructure key),
       (Field @"value" (toJSONStructure value),
       ()))
+
+
+type (:::) = Spec.Required
+type (::?) = Spec.Optional
 
 
