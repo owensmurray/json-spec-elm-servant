@@ -1,6 +1,6 @@
 cabal-version:       3.0
 name:                json-spec-elm-servant
-version:             0.4.0.1
+version:             0.4.0.2
 synopsis:            Generated elm code for servant APIs.
 description:         Generate Elm encoders, decoders, and API requests
                      for an Servant API, where the shape of the data
@@ -26,7 +26,7 @@ common dependencies
     , base          >= 4.19.0.0 && < 4.20
     , containers    >= 0.6.8    && < 0.7
     , elm-syntax    >= 0.3.3.0  && < 0.4
-    , json-spec     >= 0.3.0.0  && < 0.4
+    , json-spec     >= 0.3.0.0  && < 0.6
     , servant       >= 0.20.1   && < 0.21
     , text          >= 2.1      && < 2.2
 

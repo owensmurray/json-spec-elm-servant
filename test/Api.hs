@@ -50,11 +50,11 @@ module Api (
 import Data.Aeson (FromJSON, FromJSONKey, ToJSON, ToJSONKey)
 import Data.Binary (Binary)
 import Data.ByteString (ByteString)
-import Data.JsonSpec (Field(Field, unField),
-  HasJsonDecodingSpec(DecodingSpec, fromJSONStructure),
-  HasJsonEncodingSpec(EncodingSpec, toJSONStructure), SpecJSON(SpecJSON),
-  Specification(JsonArray, JsonDateTime, JsonEither, JsonInt, JsonLet,
-  JsonObject, JsonRef, JsonString, JsonTag), Tag(Tag))
+import Data.JsonSpec (Field(Field), HasJsonDecodingSpec(DecodingSpec,
+  fromJSONStructure), HasJsonEncodingSpec(EncodingSpec, toJSONStructure),
+  SpecJSON(SpecJSON), Specification(JsonArray, JsonDateTime, JsonEither,
+  JsonInt, JsonLet, JsonObject, JsonRef, JsonString, JsonTag), Tag(Tag),
+  unField)
 import Data.Map (Map)
 import Data.Set (Set)
 import Data.Text (Text)
