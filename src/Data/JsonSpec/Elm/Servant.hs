@@ -7,6 +7,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
@@ -17,6 +18,7 @@
 module Data.JsonSpec.Elm.Servant (
   -- * Generating Elm Clients
   servantDefs,
+  generateElm,
 
   -- * Extensions
   {-|
@@ -37,12 +39,14 @@ module Data.JsonSpec.Elm.Servant (
 import Bound (Var(B, F), Scope, abstract1, closed, toScope)
 import Control.Monad.Writer (MonadTrans(lift), MonadWriter(tell),
   execWriter)
-import Data.Foldable (Foldable(fold))
+import Data.Foldable (Foldable(fold), traverse_)
+import Data.HashMap.Strict (HashMap)
 import Data.JsonSpec (HasJsonDecodingSpec(DecodingSpec),
   HasJsonEncodingSpec(EncodingSpec))
 import Data.JsonSpec.Elm (HasType(decoderOf, encoderOf, typeOf),
   Definitions)
-import Data.Maybe (fromMaybe, mapMaybe)
+import Data.List (drop, foldl', init, unlines)
+import Data.Maybe (fromJust, fromMaybe, mapMaybe)
 import Data.Proxy (Proxy(Proxy))
 import Data.Set (Set)
 import Data.String (IsString(fromString))
@@ -51,30 +55,51 @@ import Data.Void (Void, absurd)
 import GHC.TypeLits (KnownSymbol, Symbol, symbolVal)
 import Language.Elm.Definition (Definition)
 import Language.Elm.Expression ((<|), Expression)
+import Language.Elm.Name (Module)
+import Language.Elm.Pretty (modules)
 import Language.Elm.Type (Type)
 import Network.HTTP.Types (Method)
-import Prelude (Applicative(pure), Foldable(foldr, length), Maybe(Just,
-  Nothing), Semigroup((<>)), ($), (.), (<$>), Eq, Int, error, reverse)
+import Prelude (Applicative(pure), Bool(False, True), Eq((==)),
+  Foldable(foldr, length), Functor(fmap), Maybe(Just, Nothing),
+  Monad((>>=)), Monoid(mconcat), Semigroup((<>)), Show(show),
+  Traversable(sequence, traverse), ($), (.), (<$>), IO, Int, String,
+  error, putStrLn, reverse)
+import Prettyprinter (defaultLayoutOptions, layoutPretty)
+import Prettyprinter.Render.Text (renderStrict)
 import Servant.API (ReflectMethod(reflectMethod), (:<|>), (:>), Capture,
   Header', Headers, JSON, NamedRoutes, NoContent, NoContentVerb, Optional,
   QueryParam', ReqBody', Required, ToServantApi, Verb)
+import System.Directory.OsPath (createDirectoryIfMissing,
+  doesDirectoryExist, listDirectory)
+import System.OsPath ((</>), OsPath, OsString, osp, splitExtension)
+import System.Process (readProcess)
+import qualified Data.HashMap.Strict as HM
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as TE
+import qualified Data.Text.IO as TIO
 import qualified Language.Elm.Definition as Def
 import qualified Language.Elm.Expression as Expr
 import qualified Language.Elm.Name as Name
 import qualified Language.Elm.Pattern as Pat
 import qualified Language.Elm.Type as Type
+import qualified System.OsPath as OsPath
 
 
 {-|
   This function will traverse the @api@ type, generating elm definitions for:
+
   * Http requests for each endpoint, including encoders and decoders for
     anonymous elm types.
+
   * Named Elm types (i.e. Any 'Specification' that is bound to a name using
     'JsonLet'
+
   * Decoders and Encoders for named elm types.
+
+  You can consume the resulting 'Definition's using the
+  [elm-syntax:Language.Elm.Pretty](https://hackage.haskell.org/package/elm-syntax-0.3.3.0/docs/Language-Elm-Pretty.html)
+  module.
 -}
 servantDefs :: forall api. (Elmable api) => Proxy api -> Set Definition
 servantDefs _ =
@@ -470,7 +495,7 @@ requestFunctionBody params method decoder =
                 [ let
                     name :: Text
                     name  = case qp of { RequiredQP n -> n; OptionalQP n -> n}
-                        
+
                     queryExpr :: Expression Param
                     queryExpr =
                       Expr.apps
@@ -554,4 +579,133 @@ sym
   => b
 sym = fromString $ symbolVal (Proxy @a)
 
+
+{-|
+  "Batteries included" way to generate some Elm code on disk in a given
+  a directory. The directory should be dedicated to the generated Elm
+  code and you shouldn't try to store anything else in that directory,
+  Elm files or otherwise.
+
+  This function will succeed without error if (and only if) the directory
+  already exists /and/ its contents exactly match what would be generated
+  anyway.
+
+  If the files on disk are wrong, then an error is thrown, and the files
+  are unmodified.
+
+  If the directory does not exist, then it is created and the Elm code
+  is generated inside the directory, /then an error is thrown/.
+
+  The intent is that you can use this function (thinly wrapped with
+  the appropriate directory and api spec) as the main function for a
+  test suite, where the "test" is that the files on disk are /already/
+  correct. We throw an error even in the case where we generate files
+  for you because, for instance, you wouldn't want CI to be generating
+  these files when you forgot to check them in in the first place.
+-}
+generateElm
+  :: forall api. (Elmable api)
+  => OsPath {-^ The directory in which to deposit Elm code. -}
+  -> Proxy api
+  -> IO ()
+generateElm dir Proxy = do
+    definitions :: HashMap Module Text
+      <-
+        traverse
+          (
+            elmFormat
+            . (<> "\n")
+            . renderStrict
+            . layoutPretty defaultLayoutOptions
+          )
+        . modules
+        . Set.toList
+        $ servantDefs (Proxy @api)
+
+    doesDirectoryExist dir >>= \case
+      False -> do
+        traverse_ writeModule (HM.toList definitions)
+        error $
+          unlines
+            [ ""
+            , "   We successfully generated the elm code, but we are going to"
+            , "   fail the test anyway because the the success criteria for"
+            , "   the test is that the generated files on disk are _already_"
+            , "   correct. You wouldn't want CI to pass in this case,"
+            , "   for instance."
+            ]
+      True -> do
+        checkModules definitions
+        putStrLn "Test passes. Generated files are up to date."
+  where
+    elmFormat :: Text -> IO Text
+    elmFormat elmCode = do
+      putStrLn $ "Formatting: " <> show elmCode
+      result <-
+        Text.pack <$>
+          readProcess
+            "elm-format"
+            ["--stdin"]
+            (Text.unpack elmCode)
+      putStrLn $ "Result: " <> show result
+      pure result
+
+
+    checkModules :: HashMap Module Text -> IO ()
+    checkModules generatedModules = do
+        modulesOnDisk <- getFiles dir
+        if modulesOnDisk == generatedModules
+          then pure ()
+          else do
+            putStrLn $
+              unlines
+                [ "expected: " <> show generatedModules
+                , "actual:   " <> show modulesOnDisk
+                , ""
+                ]
+            error $
+              "Please regenerate modules by completely deleting the `"
+              <> show dir <> "` directory and then running the test again."
+      where
+        getFiles :: OsPath -> IO (HashMap Module Text)
+        getFiles path =
+          case splitExtension path of
+            (pToStr -> mod, pToStr -> ".elm") -> do
+              content <- TIO.readFile (pToStr path)
+              pure $
+                HM.singleton
+                  (
+                    drop 1
+                    . Text.split (== '/')
+                    . Text.pack
+                    $ mod
+                  )
+                  content
+            _ -> do
+              children <- listDirectory path
+              fmap mconcat . sequence $
+                [ getFiles (path </> child)
+                | child <- children
+                ]
+
+
+    writeModule :: (Module, Text) -> IO ()
+    writeModule (module_, content) = do
+        createDirectoryIfMissing True dirname
+        path <- OsPath.decodeUtf filename
+        TIO.writeFile path content
+      where
+        pathName :: [Text] -> OsPath
+        pathName =
+          foldl' (</>) dir
+          . fmap (fromJust . OsPath.encodeUtf . Text.unpack)
+
+        filename :: OsPath
+        filename = pathName module_ <> [osp|.elm|]
+
+        dirname :: OsPath
+        dirname = pathName (init module_)
+
+    pToStr :: OsString -> String
+    pToStr = fmap OsPath.toChar . OsPath.unpack
 
