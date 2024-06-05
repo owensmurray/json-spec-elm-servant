@@ -70,11 +70,18 @@ import qualified Language.Elm.Type as Type
 
 {-|
   This function will traverse the @api@ type, generating elm definitions for:
+
   * Http requests for each endpoint, including encoders and decoders for
     anonymous elm types.
+
   * Named Elm types (i.e. Any 'Specification' that is bound to a name using
     'JsonLet'
+
   * Decoders and Encoders for named elm types.
+
+  You can consume the resulting 'Definition's using the
+  [elm-syntax:Language.Elm.Pretty](https://hackage.haskell.org/package/elm-syntax-0.3.3.0/docs/Language-Elm-Pretty.html)
+  module.
 -}
 servantDefs :: forall api. (Elmable api) => Proxy api -> Set Definition
 servantDefs _ =
@@ -470,7 +477,7 @@ requestFunctionBody params method decoder =
                 [ let
                     name :: Text
                     name  = case qp of { RequiredQP n -> n; OptionalQP n -> n}
-                        
+
                     queryExpr :: Expression Param
                     queryExpr =
                       Expr.apps
