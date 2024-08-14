@@ -50,11 +50,15 @@ module Api (
 import Data.Aeson (FromJSON, FromJSONKey, ToJSON, ToJSONKey)
 import Data.Binary (Binary)
 import Data.ByteString (ByteString)
-import Data.JsonSpec (Field(Field), HasJsonDecodingSpec(DecodingSpec,
-  fromJSONStructure), HasJsonEncodingSpec(EncodingSpec, toJSONStructure),
-  SpecJSON(SpecJSON), Specification(JsonArray, JsonDateTime, JsonEither,
-  JsonInt, JsonLet, JsonObject, JsonRef, JsonString, JsonTag), Tag(Tag),
-  unField)
+import Data.JsonSpec
+  ( Field(Field), HasJsonDecodingSpec(DecodingSpec, fromJSONStructure)
+  , HasJsonEncodingSpec(EncodingSpec, toJSONStructure), SpecJSON(SpecJSON)
+  , Specification
+    ( JsonArray, JsonDateTime, JsonEither, JsonInt, JsonLet, JsonObject, JsonRef
+    , JsonString, JsonTag
+    )
+  , Tag(Tag), unField
+  )
 import Data.Map (Map)
 import Data.Set (Set)
 import Data.Text (Text)
@@ -62,13 +66,16 @@ import Data.Text.Encoding (encodeUtf8)
 import Data.Time (UTCTime)
 import Data.UUID (UUID)
 import GHC.Generics (Generic)
-import Prelude (Applicative(pure), Either(Left, Right), Functor(fmap),
-  Traversable(traverse), (.), (<$>), Eq, Int, Maybe, Ord)
-import Servant.API (FromHttpApiData(parseHeader, parseQueryParam),
-  GenericMode((:-)), StdMethod(GET), (:>), Capture, DeleteNoContent,
-  Get, Header, Header', Headers, JSON, NamedRoutes, NoContent, Optional,
-  Post, PostNoContent, QueryParam', ReqBody, ReqBody', Required, Strict,
-  ToHttpApiData, Verb)
+import Prelude
+  ( Applicative(pure), Either(Left, Right), Functor(fmap), Traversable(traverse)
+  , (.), (<$>), Eq, Int, Maybe, Ord
+  )
+import Servant.API
+  ( FromHttpApiData(parseHeader, parseQueryParam), GenericMode((:-))
+  , StdMethod(GET), (:>), Capture, DeleteNoContent, Get, Header, Header'
+  , Headers, JSON, NamedRoutes, NoContent, Optional, Post, PostNoContent
+  , QueryParam', ReqBody, ReqBody', Required, Strict, ToHttpApiData, Verb
+  )
 import Web.Cookie (SetCookie)
 import qualified Data.JsonSpec as Spec
 import qualified Data.Map as Map

@@ -37,14 +37,13 @@ module Data.JsonSpec.Elm.Servant (
 
 
 import Bound (Var(B, F), Scope, abstract1, closed, toScope)
-import Control.Monad.Writer (MonadTrans(lift), MonadWriter(tell),
-  execWriter)
+import Control.Monad.Writer (MonadTrans(lift), MonadWriter(tell), execWriter)
 import Data.Foldable (Foldable(fold), traverse_)
 import Data.HashMap.Strict (HashMap)
-import Data.JsonSpec (HasJsonDecodingSpec(DecodingSpec),
-  HasJsonEncodingSpec(EncodingSpec))
-import Data.JsonSpec.Elm (HasType(decoderOf, encoderOf, typeOf),
-  Definitions)
+import Data.JsonSpec
+  ( HasJsonDecodingSpec(DecodingSpec), HasJsonEncodingSpec(EncodingSpec)
+  )
+import Data.JsonSpec.Elm (HasType(decoderOf, encoderOf, typeOf), Definitions)
 import Data.List (drop, foldl', init, unlines)
 import Data.Maybe (fromJust, fromMaybe, mapMaybe)
 import Data.Proxy (Proxy(Proxy))
@@ -59,18 +58,22 @@ import Language.Elm.Name (Module)
 import Language.Elm.Pretty (modules)
 import Language.Elm.Type (Type)
 import Network.HTTP.Types (Method)
-import Prelude (Applicative(pure), Bool(False, True), Eq((==)),
-  Foldable(foldr, length), Functor(fmap), Maybe(Just, Nothing),
-  Monad((>>=)), Monoid(mconcat), Semigroup((<>)), Show(show),
-  Traversable(sequence, traverse), ($), (.), (<$>), IO, Int, String,
-  error, putStrLn, reverse)
+import Prelude
+  ( Applicative(pure), Bool(False, True), Eq((==)), Foldable(foldr, length)
+  , Functor(fmap), Maybe(Just, Nothing), Monad((>>=)), Monoid(mconcat)
+  , Semigroup((<>)), Show(show), Traversable(sequence, traverse), ($), (.)
+  , (<$>), IO, Int, String, error, putStrLn, reverse
+  )
 import Prettyprinter (defaultLayoutOptions, layoutPretty)
 import Prettyprinter.Render.Text (renderStrict)
-import Servant.API (ReflectMethod(reflectMethod), (:<|>), (:>), Capture,
-  Header', Headers, JSON, NamedRoutes, NoContent, NoContentVerb, Optional,
-  QueryParam', ReqBody', Required, ToServantApi, Verb)
-import System.Directory.OsPath (createDirectoryIfMissing,
-  doesDirectoryExist, listDirectory)
+import Servant.API
+  ( ReflectMethod(reflectMethod), (:<|>), (:>), Capture, Header', Headers, JSON
+  , NamedRoutes, NoContent, NoContentVerb, Optional, QueryParam', ReqBody'
+  , Required, ToServantApi, Verb
+  )
+import System.Directory.OsPath
+  ( createDirectoryIfMissing, doesDirectoryExist, listDirectory
+  )
 import System.OsPath ((</>), OsPath, OsString, osp, splitExtension)
 import System.Process (readProcess)
 import qualified Data.HashMap.Strict as HM
