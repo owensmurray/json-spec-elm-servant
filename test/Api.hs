@@ -57,7 +57,6 @@ import Data.JsonSpec
     ( JsonArray, JsonDateTime, JsonEither, JsonInt, JsonLet, JsonObject, JsonRef
     , JsonString, JsonTag
     )
-  , Tag(Tag), unField
   )
 import Data.Map (Map)
 import Data.Set (Set)
@@ -67,8 +66,7 @@ import Data.Time (UTCTime)
 import Data.UUID (UUID)
 import GHC.Generics (Generic)
 import Prelude
-  ( Applicative(pure), Either(Left, Right), Functor(fmap), Traversable(traverse)
-  , (.), (<$>), Eq, Int, Maybe, Ord
+  ( Applicative(pure), Either(Right), (.), Eq, Int, Maybe, Ord, undefined
   )
 import Servant.API
   ( FromHttpApiData(parseHeader, parseQueryParam), GenericMode((:-))
@@ -78,9 +76,6 @@ import Servant.API
   )
 import Web.Cookie (SetCookie)
 import qualified Data.JsonSpec as Spec
-import qualified Data.Map as Map
-import qualified Data.Set as Set
-import qualified Data.UUID as UUID
 
 
 data Api mode = Api
@@ -210,16 +205,7 @@ instance HasJsonEncodingSpec DashboardData where
           )
        ]
        (JsonRef "DashboardData")
-  toJSONStructure DashboardData {proposals, credits, user} =
-    (Field @"proposals"
-      [ (Field @"key" (toJSONStructure k),
-        (Field @"value" (toJSONStructure v),
-        ()))
-      | (k, v) <- Map.toAscList proposals
-      ],
-    (Field @"credits" (toJSONStructure credits),
-    (Field @"user" (toJSONStructure user),
-    ())))
+  toJSONStructure = undefined
 
 
 data Proposal = Proposal
@@ -244,49 +230,10 @@ instance HasJsonEncodingSpec Proposal where
        ,      "invites" ::: JsonArray (EncodingSpec Invite)
        ,   "created-at" ::: JsonDateTime
        ]
-  toJSONStructure
-      Proposal
-        { name
-        , owner
-        , availability
-        , description
-        , invites
-        , venue
-        , createdAt
-        }
-    =
-      (Field @"name" (toJSONStructure name),
-      (Field @"owner" (toJSONStructure owner),
-      (Field @"availability" (toJSONStructure <$> availability),
-      (Field @"description" description,
-      (Field @"venue" venue,
-      (Field @"invites" (toJSONStructure <$> Set.toList invites),
-      (Field @"created-at" createdAt,
-      ())))))))
+  toJSONStructure = undefined
 instance HasJsonDecodingSpec Proposal where
   type DecodingSpec Proposal = EncodingSpec Proposal
-  fromJSONStructure
-      (Field @"name" name,
-      (Field @"owner" user,
-      (Field @"availability" rawAvailability,
-      (Field @"description" description,
-      (Field @"venue" venue,
-      (Field @"invites" rawInvites,
-      (Field @"created-at" createdAt,
-      ())))))))
-    = do
-      availability <- traverse fromJSONStructure rawAvailability
-      invites <- traverse fromJSONStructure rawInvites
-      pure
-        Proposal
-          { name = Name name
-          , owner = DiscordUser user
-          , description
-          , availability
-          , invites = Set.fromList invites
-          , venue
-          , createdAt
-          }
+  fromJSONStructure = undefined
 
 
 data Invite
@@ -312,33 +259,10 @@ instance HasJsonEncodingSpec Invite where
           )
        ]
        (JsonRef "Invite")
-  toJSONStructure = \case
-    InviteUser user ->
-      Left
-        (Field @"type" (Tag @"discord-user"),
-        (Field @"username" (toJSONStructure user),
-        ()))
-    InviteGuild guild ->
-      Right
-        (Field @"type" (Tag @"discord-server"),
-        (Field @"guild" (toJSONStructure guild),
-        ()))
+  toJSONStructure = undefined
 instance HasJsonDecodingSpec Invite where
   type DecodingSpec Invite = EncodingSpec Invite
-  fromJSONStructure = \case
-    Left
-        (Field @"type" (Tag @"discord-user"),
-        (Field @"username" user,
-        ()))
-      ->
-        InviteUser <$> fromJSONStructure user
-
-    Right
-        (Field @"type" (Tag @"discord-server"),
-        (Field @"guild" guild,
-        ()))
-      ->
-        InviteGuild <$> fromJSONStructure guild
+  fromJSONStructure = undefined
 
 
 data Guild = Guild
@@ -353,19 +277,10 @@ instance HasJsonEncodingSpec Guild where
       '[   "id" ::: EncodingSpec GuildId
        , "name" ::: JsonString
        ]
-  toJSONStructure Guild { guildId , name } =
-    (Field @"id" (toJSONStructure guildId),
-    (Field @"name" name,
-    ()))
+  toJSONStructure = undefined
 instance HasJsonDecodingSpec Guild where
   type DecodingSpec Guild = EncodingSpec Guild
-  fromJSONStructure
-      (Field @"id" id_,
-      (Field @"name" name,
-      ()))
-    = do
-      guildId <- fromJSONStructure id_
-      pure Guild { guildId , name }
+  fromJSONStructure = undefined
 
 
 newtype GuildId = GuildId
@@ -388,27 +303,14 @@ data AvailabilityInterval = AvailabilityInterval
   deriving ToJSON via (SpecJSON AvailabilityInterval)
 instance HasJsonDecodingSpec AvailabilityInterval where
   type DecodingSpec AvailabilityInterval = EncodingSpec AvailabilityInterval
-  fromJSONStructure
-      (Field @"interval" rawInterval,
-      (Field @"users" rawUsers,
-      ()))
-    = do
-      interval <- fromJSONStructure rawInterval
-      pure
-        AvailabilityInterval
-          { interval
-          , users = Set.fromList (DiscordUser <$> rawUsers)
-          }
+  fromJSONStructure = undefined
 instance HasJsonEncodingSpec AvailabilityInterval where
   type EncodingSpec AvailabilityInterval =
     JsonObject
       '[ "interval" ::: EncodingSpec Interval
        ,    "users" ::: JsonArray (EncodingSpec DiscordUser)
        ]
-  toJSONStructure AvailabilityInterval { interval , users } =
-    (Field @"interval" (toJSONStructure interval),
-    (Field @"users" (toJSONStructure <$> Set.toList users),
-    ()))
+  toJSONStructure = undefined
 
 
 newtype AvailableCredits = AvailableCredits
@@ -417,7 +319,7 @@ newtype AvailableCredits = AvailableCredits
   deriving ToJSON via (SpecJSON AvailableCredits)
 instance HasJsonEncodingSpec AvailableCredits where
   type EncodingSpec AvailableCredits = JsonInt
-  toJSONStructure = unAvailableCredits
+  toJSONStructure = undefined
 
 
 data UnprotectedApi mode = UnprotectedApi
@@ -458,9 +360,7 @@ instance HasJsonEncodingSpec FEConfig where
   type EncodingSpec FEConfig =
     JsonObject
       '[ "redirectUrl" ::: JsonString ]
-  toJSONStructure FEConfig { discordRedirect } =
-    (Field @"redirectUrl" discordRedirect,
-    ())
+  toJSONStructure = undefined
 
 newtype Email = Email
   { unEmail :: Text
@@ -475,7 +375,7 @@ newtype DiscordAccessToken = DiscordAccessToken
   deriving (FromJSON) via (SpecJSON DiscordAccessToken)
 instance HasJsonDecodingSpec DiscordAccessToken where
   type DecodingSpec DiscordAccessToken = JsonString
-  fromJSONStructure = pure . DiscordAccessToken
+  fromJSONStructure = undefined
 
 
 newtype Token = Token
@@ -501,7 +401,7 @@ newtype ProposalId = ProposalId
   deriving ToJSON via (SpecJSON ProposalId)
 instance HasJsonEncodingSpec ProposalId where
   type EncodingSpec ProposalId = JsonString
-  toJSONStructure = UUID.toText . unProposalId
+  toJSONStructure = undefined
 
 
 data NewProposalReq = NewProposalReq
@@ -519,22 +419,7 @@ instance HasJsonDecodingSpec NewProposalReq where
        ,  "description" ::: JsonString
        ,        "venue" ::? JsonString
        ]
-  fromJSONStructure
-      (Field @"name" rawName,
-      (Field @"availability" rawAvailability,
-      (Field @"description" description,
-      (fmap (unField @"venue") -> venue,
-      ()))))
-    = do
-      name <- fromJSONStructure rawName
-      availability <- fromJSONStructure rawAvailability
-      pure
-        NewProposalReq
-          { name
-          , availability
-          , description
-          , venue
-          }
+  fromJSONStructure = undefined
 
 
 newtype Availability = Availability
@@ -543,9 +428,7 @@ newtype Availability = Availability
   deriving FromJSON via (SpecJSON Availability)
 instance HasJsonDecodingSpec Availability where
   type DecodingSpec Availability = JsonArray (DecodingSpec Interval)
-  fromJSONStructure =
-      fmap (Availability . Set.fromList)
-      . traverse fromJSONStructure
+  fromJSONStructure = undefined
 
 
 newtype Name = Name
@@ -554,10 +437,10 @@ newtype Name = Name
   deriving (ToJSON, FromJSON) via (SpecJSON Name)
 instance HasJsonEncodingSpec Name where
   type EncodingSpec Name = JsonString
-  toJSONStructure = unName
+  toJSONStructure = undefined
 instance HasJsonDecodingSpec Name where
   type DecodingSpec Name = EncodingSpec Name
-  fromJSONStructure = pure . Name
+  fromJSONStructure = undefined
 
 
 data Interval = Interval
@@ -572,27 +455,10 @@ instance HasJsonEncodingSpec Interval where
       '[ "startInclusive" ::: JsonDateTime
        ,   "endExclusive" ::: JsonDateTime
        ]
-  toJSONStructure
-      Interval
-        { startInclusive
-        , endExclusive
-        }
-    =
-      (Field @"startInclusive" startInclusive,
-      (Field @"endExclusive" endExclusive,
-      ()))
+  toJSONStructure = undefined
 instance HasJsonDecodingSpec Interval where
   type DecodingSpec Interval = EncodingSpec Interval
-  fromJSONStructure
-      (Field @"startInclusive" startInclusive,
-      (Field @"endExclusive" endExclusive,
-      ()))
-    = do
-      pure
-        Interval
-          { startInclusive
-          , endExclusive
-          }
+  fromJSONStructure = undefined
 
 
 newtype DiscordUser = DiscordUser
@@ -602,10 +468,10 @@ newtype DiscordUser = DiscordUser
   deriving ToJSON via (SpecJSON DiscordUser)
 instance HasJsonEncodingSpec DiscordUser where
   type EncodingSpec DiscordUser = JsonString
-  toJSONStructure = unDiscordUser
+  toJSONStructure = undefined
 instance HasJsonDecodingSpec DiscordUser where
   type DecodingSpec DiscordUser = EncodingSpec DiscordUser
-  fromJSONStructure = pure . DiscordUser
+  fromJSONStructure = undefined
 
 
 data KV k v = KV
@@ -614,21 +480,14 @@ data KV k v = KV
   }
 deriving via (SpecJSON (KV ProposalId Proposal)) instance
   ToJSON (KV ProposalId Proposal)
-instance
-    (HasJsonEncodingSpec k, HasJsonEncodingSpec v)
-  =>
-    HasJsonEncodingSpec (KV k v)
-  where
+instance HasJsonEncodingSpec (KV k v) where
     type EncodingSpec (KV k v) =
       JsonObject
         '[   "key" ::: EncodingSpec k
          , "value" ::: EncodingSpec v
          ]
 
-    toJSONStructure KV { key , value } =
-      (Field @"key" (toJSONStructure key),
-      (Field @"value" (toJSONStructure value),
-      ()))
+    toJSONStructure = undefined
 
 
 type (:::) = Spec.Required
