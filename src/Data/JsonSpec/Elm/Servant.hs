@@ -25,7 +25,8 @@ module Data.JsonSpec.Elm.Servant (
     The symbols in this section are mainly exposed in case you are using
     some extensions to the standard servant types and need to build some
     companion extensions to generate proper Elm types for them. For most
-    normal usage you will probably just use 'servantDefs'.
+    normal usage you will probably just use 'generateElm' (or possibly
+    'servantDefs').
   -}
   Elmable(..),
   IsParam(..),
