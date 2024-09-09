@@ -315,6 +315,16 @@ instance (ReflectMethod method) => Elmable (NoContentVerb method) where
 -}
 class IsParam a where
   param :: Definitions Param
+{-|
+  The default instance assumes that the API combinator does not contribute
+  to the parameter list or the "name of the endpoint" in any way. This
+  covers things like 'Summary' and 'Description', or potentially custom
+  combinators created by the user. In the case of custom combinators,
+  you may need to create an overlapping instance if you wish it to affect
+  the elm function parameters or function name.
+-}
+instance {-# OVERLAPPABLE #-} IsParam a where
+  param = pure Ignore
 instance (KnownSymbol name) => IsParam (Capture name tpy) where
   param = pure $ PathParam (Capture (sym @name))
 instance (KnownSymbol name) => IsParam (Header' (Optional : mods) name a) where
@@ -430,6 +440,7 @@ requestFunctionType params responseType =
               HeaderParam (OptionalHeader _) ->
                 Just ("Basics.Maybe" `Type.App` "Basics.String")
               BodyEncoder typ _ -> Just typ
+              Ignore -> Nothing
             )
             params
         )
@@ -536,6 +547,8 @@ requestFunctionBody params method decoder =
           (Bound.closed e)
       (PathParam (Static _) : more) e ->
         buildLambda more e
+      (Ignore : more) e ->
+        buildLambda more e
       (p : more) e ->
         buildLambda
           more
@@ -550,6 +563,7 @@ data Param
       { elmType :: Type Void
       , encoder :: Expression Void
       }
+  | Ignore {-^ This is for things like `Summary` -}
   deriving stock (Eq)
 
 

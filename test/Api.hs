@@ -72,7 +72,8 @@ import Servant.API
   ( FromHttpApiData(parseHeader, parseQueryParam), GenericMode((:-))
   , StdMethod(GET), (:>), Capture, DeleteNoContent, Get, Header, Header'
   , Headers, JSON, NamedRoutes, NoContent, Optional, Post, PostNoContent
-  , QueryParam', ReqBody, ReqBody', Required, Strict, ToHttpApiData, Verb
+  , QueryParam', ReqBody, ReqBody', Required, Strict, Summary, ToHttpApiData
+  , Verb
   )
 import Web.Cookie (SetCookie)
 import qualified Data.JsonSpec as Spec
@@ -100,6 +101,7 @@ instance FromHttpApiData Cookie where
 data ProtectedApi mode = ProtectedApi
   { makeProposal :: mode
       :- "proposal"
+      :> Summary "a summary"
       :> ReqBody' '[Required, Strict] '[JSON] NewProposalReq
       :> Post '[JSON] (KV ProposalId Proposal)
 
