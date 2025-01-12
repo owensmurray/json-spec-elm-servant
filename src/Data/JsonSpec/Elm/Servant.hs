@@ -54,7 +54,7 @@ import Data.Text (Text)
 import Data.Void (Void, absurd)
 import GHC.TypeLits (KnownSymbol, Symbol, symbolVal)
 import Language.Elm.Definition (Definition)
-import Language.Elm.Expression ((<|), Expression)
+import Language.Elm.Expression (Expression)
 import Language.Elm.Name (Module)
 import Language.Elm.Pretty (modules)
 import Language.Elm.Type (Type)
@@ -147,7 +147,7 @@ builtins =
         (
           toScope $
             let
-              var :: Type (Bound.Var Int a)
+              var :: Type (Bound.Var Int void)
               var = Type.Var (B 0)
             in
               Type.Fun
@@ -237,7 +237,130 @@ builtins =
                                 ]
                         )
                   ]
+        )
+    , Def.Constant
+        "Api.Req.task_"
+        2
+        (
+          toScope $
+            let
+              returnTypeVar :: Type (Bound.Var Int void)
+              returnTypeVar = Type.Var (B 0)
 
+              errTypeVar :: Type (Bound.Var Int void)
+              errTypeVar =
+                "Api.Req.Either"
+                `Type.App` "Http.Error"
+                `Type.App` Type.Var (B 1)
+
+              errorParserType :: Type (Bound.Var Int void)
+              errorParserType =
+                Type.Fun "Basics.Int"
+                . Type.Fun "Basics.String"
+                $ "Basics.Maybe" `Type.App` Type.Var (B 1)
+            in
+              Type.Fun
+                ("Api.Req.Request" `Type.App` returnTypeVar)
+                (
+                  Type.Fun
+                    errorParserType
+                    (Type.apps "Task.Task" [errTypeVar, returnTypeVar])
+                )
+        )
+        (
+          lam (\_req -> lam (\_errorParser ->
+            let
+              req :: Expression (Var () (Var () Void))
+              req = Expr.Var (F (B ()))
+
+              f :: Text -> b -> (Name.Field, b)
+              f name expr = (Name.Field name, expr)
+
+              p :: Expression v -> Text -> Expression v
+              p v name = Expr.Proj (Name.Field name) `Expr.App` v
+            in
+              "Http.task" <|
+                Expr.Record
+                  [ f "method"   $ p req "method"
+                  , f "headers"  $ p req "headers"
+                  , f "url"      $ p req "url"
+                  , f "body"     $ p req "body"
+                  , f "timeout"    "Maybe.Nothing"
+                  , f "resolver" $
+                      "Http.stringResolver" <|
+                        (
+                          lam (\var ->
+                            let
+                              pat
+                                :: Name.Qualified
+                                -> [Pat.Pattern v]
+                                -> Expression (Bound.Var b a)
+                                -> (Pat.Pattern v, Scope b Expression a)
+                              pat con vars expr =
+                                (Pat.Con con vars, toScope expr)
+
+                              patVar :: Int -> Expression (Bound.Var Int a)
+                              patVar n = Expr.Var (B n)
+
+                              httpErr :: Expression v -> Expression v
+                              httpErr a =
+                                  "Result.Err" <| ("Api.Req.Left" <| a)
+                            in
+                              Expr.Case
+                                var
+                                [ pat "Http.BadUrl_" [Pat.Var 0] $
+                                    httpErr $
+                                      "Http.BadUrl" <| patVar 0
+                                , pat "Http.Timeout_" [] $
+                                    httpErr "Http.Timeout"
+                                , pat "Http.NetworkError_" [] $
+                                    httpErr "Http.NetworkError"
+                                , pat "Http.BadStatus_" [Pat.Var 0, Pat.Var 1] $
+                                    "Result.Err"
+                                    <| (
+                                         "Maybe.withDefault"
+                                         <| "Api.Req.Left"
+                                         <| "Http.BadStatus"
+                                         <| p (patVar 0) "statusCode"
+                                       )
+                                    <| ("Maybe.map" <| "Api.Req.Right")
+                                    <| (
+                                         Expr.Var (F . F $ B ())
+                                         <| p (patVar 0) "statusCode"
+                                       )
+                                    <| patVar 1
+                                , pat
+                                    "Http.GoodStatus_"
+                                    [Pat.Var 0, Pat.Var 1]
+                                    (
+                                      Expr.Case
+                                        ( F . F <$> p req "decoder")
+                                        [ pat "Api.Req.Left" [Pat.Var 0] $
+                                            "Result.Ok" <| patVar 0
+                                        , pat "Api.Req.Right" [Pat.Var 0] $
+                                            Expr.Case
+                                              (
+                                                Expr.apps
+                                                  "Json.Decode.decodeString"
+                                                  [ patVar 0
+                                                  , F <$> patVar 1
+                                                  ]
+                                              )
+                                              [ pat "Result.Err" [Pat.Var 0] $
+                                                  httpErr $
+                                                    "Http.BadBody"
+                                                    <| "Json.Decode.errorToString"
+                                                    <| patVar 0
+                                              , pat "Result.Ok" [Pat.Var 0] $
+                                                  "Result.Ok" <| patVar 0
+                                              ]
+                                        ]
+                                    )
+                                ]
+                          )
+                        )
+                  ]
+          ))
         )
     ]
 
@@ -726,4 +849,28 @@ generateElm dir Proxy = do
 
     pToStr :: OsString -> String
     pToStr = fmap OsPath.toChar . OsPath.unpack
+
+
+{-|
+  Produce lambda in Elm out of a haskell function.
+
+  > lam (\var ->
+  >   "elmFunction" `a` var
+  > )
+
+  produces an Elm lambda expression of the form
+
+  > (\var -> elmFunction var)
+-}
+lam
+  :: (Expression (Var () a) -> Expression (Var () v))
+  -> Expression v
+lam f =
+  Expr.Lam . toScope $ f (Expr.Var (B ()))
+
+
+infixr 5 <|
+(<|) :: Expression v -> Expression v -> Expression v
+f <| v = Expr.App f v
+
 
