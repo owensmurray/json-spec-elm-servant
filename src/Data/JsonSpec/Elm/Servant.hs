@@ -19,6 +19,7 @@ module Data.JsonSpec.Elm.Servant (
   -- * Generating Elm Clients
   servantDefs,
   generateElm,
+  generateElmExtra,
 
   -- * Extensions
   {-|
@@ -45,7 +46,6 @@ import Data.JsonSpec
   ( HasJsonDecodingSpec(DecodingSpec), HasJsonEncodingSpec(EncodingSpec)
   )
 import Data.JsonSpec.Elm (HasType(decoderOf, encoderOf, typeOf), Definitions)
-import Data.List (drop, foldl', init, unlines)
 import Data.Maybe (fromJust, fromMaybe, mapMaybe)
 import Data.Proxy (Proxy(Proxy))
 import Data.Set (Set)
@@ -60,10 +60,11 @@ import Language.Elm.Pretty (modules)
 import Language.Elm.Type (Type)
 import Network.HTTP.Types (Method)
 import Prelude
-  ( Applicative(pure), Bool(False, True), Eq((==)), Foldable(foldr, length)
-  , Functor(fmap), Maybe(Just, Nothing), Monad((>>=)), Monoid(mconcat)
-  , Semigroup((<>)), Show(show), Traversable(sequence, traverse), ($), (.)
-  , (<$>), IO, Int, String, error, putStrLn, reverse
+  ( Applicative(pure), Bool(False, True), Eq((==))
+  , Foldable(foldl', foldr, length), Functor(fmap), Maybe(Just, Nothing)
+  , Monad((>>=)), Monoid(mconcat, mempty), Semigroup((<>)), Show(show)
+  , Traversable(sequence, traverse), ($), (.), (<$>), IO, Int, String, drop
+  , error, init, putStrLn, reverse, unlines
   )
 import Prettyprinter (defaultLayoutOptions, layoutPretty)
 import Prettyprinter.Render.Text (renderStrict)
@@ -749,7 +750,23 @@ generateElm
   => OsPath {-^ The directory in which to deposit Elm code. -}
   -> Proxy api
   -> IO ()
-generateElm dir Proxy = do
+generateElm dir proxy =
+  generateElmExtra dir proxy mempty
+
+
+{-|
+  Like 'generateElm', but allow for some extra definitions to be
+  added. This might be useful for piling on elm definitions that need
+  to be decoded by the front end but which are not directly referenced
+  in your servant API (e.g. a common response body for error responses).
+-}
+generateElmExtra
+  :: forall api. (Elmable api)
+  => OsPath {-^ The directory in which to deposit Elm code. -}
+  -> Proxy api
+  -> Set Definition {-^ Any extra definitions you want added.  -}
+  -> IO ()
+generateElmExtra dir Proxy extra = do
     definitions :: HashMap Module Text
       <-
         traverse
@@ -761,7 +778,7 @@ generateElm dir Proxy = do
           )
         . modules
         . Set.toList
-        $ servantDefs (Proxy @api)
+        $ servantDefs (Proxy @api) <> extra
 
     doesDirectoryExist dir >>= \case
       False -> do
