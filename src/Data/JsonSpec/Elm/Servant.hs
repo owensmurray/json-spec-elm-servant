@@ -40,7 +40,7 @@ module Data.JsonSpec.Elm.Servant (
 
 import Bound (Var(B, F), Scope, abstract1, closed, toScope)
 import Control.Monad.Writer (MonadTrans(lift), MonadWriter(tell), execWriter)
-import Data.Foldable (Foldable(fold), traverse_)
+import Data.Foldable (Foldable(fold), foldl', traverse_)
 import Data.HashMap.Strict (HashMap)
 import Data.JsonSpec
   ( HasJsonDecodingSpec(DecodingSpec), HasJsonEncodingSpec(EncodingSpec)
@@ -61,7 +61,7 @@ import Language.Elm.Type (Type)
 import Network.HTTP.Types (Method)
 import Prelude
   ( Applicative(pure), Bool(False, True), Eq((==))
-  , Foldable(foldl', foldr, length), Functor(fmap), Maybe(Just, Nothing)
+  , Foldable(foldr, length), Functor(fmap), Maybe(Just, Nothing)
   , Monad((>>=)), Monoid(mconcat, mempty), Semigroup((<>)), Show(show)
   , Traversable(sequence, traverse), ($), (.), (<$>), IO, Int, String, drop
   , error, init, putStrLn, reverse, unlines
