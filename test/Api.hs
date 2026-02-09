@@ -248,16 +248,15 @@ instance HasJsonEncodingSpec Invite where
     JsonLet
       '[ '( "Invite"
           , JsonEither
-              ( JsonObject
-                  '[     "type" ::: JsonTag "discord-user"
-                   , "username" ::: EncodingSpec DiscordUser
-                   ]
-              )
-              ( JsonObject
-                  '[  "type" ::: JsonTag "discord-server"
-                   , "guild" ::: EncodingSpec Guild
-                   ]
-              )
+              '[ JsonObject
+                    '[     "type" ::: JsonTag "discord-user"
+                     , "username" ::: EncodingSpec DiscordUser
+                     ]
+                , JsonObject
+                    '[  "type" ::: JsonTag "discord-server"
+                     , "guild" ::: EncodingSpec Guild
+                     ]
+                ]
           )
        ]
        (JsonRef "Invite")
