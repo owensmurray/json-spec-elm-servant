@@ -14,7 +14,7 @@ license:             MIT
 license-file:        LICENSE
 author:              Rick Owens
 maintainer:          rick@owensmurray.com
-copyright:           2025 Owens Murray, LLC.
+copyright:           2026 Owens Murray, LLC.
 category:            JSON, Elm, Servant, Web
 build-type:          Simple
 extra-source-files:
