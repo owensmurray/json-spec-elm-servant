@@ -389,7 +389,7 @@ instance (IsParam a, Elmable b) => Elmable (a :> b) where
 instance (Elmable (Verb m c t r)) => Elmable (Verb m c t (Headers h r)) where
   endpoints = endpoints @(Verb m c t r)
 instance {- Elmable (Verb m c t NoContent) -}
-    (Elmable (NoContentVerb m))
+    (ReflectMethod m)
   =>
     Elmable (Verb m c t NoContent)
   where
@@ -471,11 +471,11 @@ instance {- IsParam (ReqBody' (Required : mods) (JSON : accept) a) -}
       encoder <- encoderOf @(DecodingSpec a)
       pure $ BodyEncoder {elmType, encoder}
 instance {- IsParam (ReqBody' (other : mods) (JSON : accept) a) -}
-    {-# overlaps #-} (IsParam (ReqBody' mods '[JSON] a))
+    {-# overlaps #-} (IsParam (ReqBody' (other : mods) accept a))
   =>
     IsParam (ReqBody' (other : mods) (JSON : accept) a)
   where
-    param = param @(ReqBody' mods '[JSON] a)
+    param = param @(ReqBody' (other : mods) accept a)
 instance {- IsParam (ReqBody' mods (other : accept) a) -}
     {-# overlaps #-} (IsParam (ReqBody' mods accept a))
   =>

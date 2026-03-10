@@ -4,3 +4,5 @@ package json-spec-elm-servant
   ghc-options:
     -Werror
 
+
+allow-newer: base, template-haskell
