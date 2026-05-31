@@ -786,11 +786,11 @@ generateElmExtra dir Proxy extra = do
         error $
           unlines
             [ ""
-            , "   We successfully generated the elm code, but we are going to"
-            , "   fail the test anyway because the the success criteria for"
-            , "   the test is that the generated files on disk are _already_"
-            , "   correct. You wouldn't want CI to pass in this case,"
-            , "   for instance."
+            , "Generated Elm modules were missing, so this test generated them."
+            , ""
+            , "To fix this failure, commit the generated modules."
+            , "The test fails because generated files must already be correct"
+            , "on disk before the test runs."
             ]
       True -> do
         checkModules definitions
@@ -798,14 +798,12 @@ generateElmExtra dir Proxy extra = do
   where
     elmFormat :: Text -> IO Text
     elmFormat elmCode = do
-      putStrLn $ "Formatting: " <> show elmCode
       result <-
         Text.pack <$>
           readProcess
             "elm-format"
             ["--stdin"]
             (Text.unpack elmCode)
-      putStrLn $ "Result: " <> show result
       pure result
 
 
@@ -814,16 +812,18 @@ generateElmExtra dir Proxy extra = do
         modulesOnDisk <- getFiles dir
         if modulesOnDisk == generatedModules
           then pure ()
-          else do
-            putStrLn $
-              unlines
-                [ "expected: " <> show generatedModules
-                , "actual:   " <> show modulesOnDisk
-                , ""
-                ]
+          else
             error $
-              "Please regenerate modules by completely deleting the `"
-              <> show dir <> "` directory and then running the test again."
+              unlines
+                [ ""
+                , "Generated Elm modules do not match the files on disk."
+                , ""
+                , "To fix this failure, completely delete the `"
+                  <> show dir
+                  <> "` directory and then run this test again."
+                , "The test will regenerate the modules. Commit the regenerated"
+                , "files after checking that they are correct."
+                ]
       where
         getFiles :: OsPath -> IO (HashMap Module Text)
         getFiles path =
