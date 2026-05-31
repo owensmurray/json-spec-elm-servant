@@ -62,7 +62,7 @@ import Network.HTTP.Types (Method)
 import Prelude
   ( Applicative(pure), Bool(False, True), Eq((==))
   , Foldable(foldr, length), Functor(fmap), Maybe(Just, Nothing)
-  , Monad((>>=)), Monoid(mconcat, mempty), Semigroup((<>)), Show(show)
+  , Monad((>>=)), Monoid(mconcat, mempty), Semigroup((<>))
   , Traversable(sequence, traverse), ($), (.), (<$>), IO, Int, String, drop
   , error, init, putStrLn, reverse, unlines
   )
@@ -818,11 +818,10 @@ generateElmExtra dir Proxy extra = do
                 [ ""
                 , "Generated Elm modules do not match the files on disk."
                 , ""
-                , "To fix this failure, completely delete the `"
-                  <> show dir
-                  <> "` directory and then run this test again."
-                , "The test will regenerate the modules. Commit the regenerated"
-                , "files after checking that they are correct."
+                , "To fix this failure, completely delete the `" <> pToStr dir <> "` directory "
+                , "and then run this test again."
+                , ""
+                , "The test will regenerate the modules."
                 ]
       where
         getFiles :: OsPath -> IO (HashMap Module Text)
