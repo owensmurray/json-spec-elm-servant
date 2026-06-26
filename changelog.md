@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.1.0
+
+- Improved Elm generator output.
+- Relaxed dependency bounds for `containers` and `time`.
+
 ## 0.5.0.0
 
 - Added support for GHC 9.14.
