@@ -46,7 +46,6 @@ module Api (
   FEConfig(..),
 ) where
 
-
 import Data.Aeson (FromJSON, FromJSONKey, ToJSON, ToJSONKey)
 import Data.Binary (Binary)
 import Data.ByteString (ByteString)
@@ -54,8 +53,8 @@ import Data.JsonSpec
   ( Field(Field), HasJsonDecodingSpec(DecodingSpec, fromJSONStructure)
   , HasJsonEncodingSpec(EncodingSpec, toJSONStructure), SpecJSON(SpecJSON)
   , Specification
-    ( JsonArray, JsonDateTime, JsonEither, JsonInt, JsonLet, JsonObject, JsonRef
-    , JsonString, JsonTag
+    ( JsonArray, JsonDateTime, JsonDict, JsonEither, JsonInt, JsonLet
+    , JsonObject, JsonRef, JsonString, JsonTag
     )
   )
 import Data.Map (Map)
@@ -77,7 +76,6 @@ import Servant.API
   )
 import Web.Cookie (SetCookie)
 import qualified Data.JsonSpec as Spec
-
 
 data Api mode = Api
   { protectedApi :: mode
@@ -193,14 +191,7 @@ instance HasJsonEncodingSpec DashboardData where
     JsonLet
       '[ '("DashboardData"
           , JsonObject
-              '[ "proposals" :::
-                    JsonArray
-                      (
-                        JsonObject
-                          '[   "key" ::: EncodingSpec ProposalId
-                           , "value" ::: EncodingSpec Proposal
-                           ]
-                      )
+              '[ "proposals" ::: JsonDict (EncodingSpec Proposal)
                , "credits" ::: EncodingSpec AvailableCredits
                , "user" ::: EncodingSpec DiscordUser
                ]

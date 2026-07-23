@@ -4,6 +4,9 @@
 
 - Improved Elm generator output.
 - Relaxed dependency bounds for `containers` and `time`.
+- Require `json-spec` >= 1.4 and `json-spec-elm` >= 0.6, which provide
+  `JsonDict` support (Elm `Dict String a`) via `json-spec-elm`. The test
+  API now exercises `JsonDict` in `DashboardData`.
 
 ## 0.5.0.0
 

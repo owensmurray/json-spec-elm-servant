@@ -37,10 +37,9 @@ module Data.JsonSpec.Elm.Servant (
   QP(..),
 ) where
 
-
 import Bound (Var(B, F), Scope, abstract1, closed, toScope)
 import Control.Monad.Writer (MonadTrans(lift), MonadWriter(tell), execWriter)
-import Data.Foldable (Foldable(fold), foldl', traverse_)
+import Data.Foldable (Foldable(fold, foldl'), traverse_)
 import Data.HashMap.Strict (HashMap)
 import Data.JsonSpec
   ( HasJsonDecodingSpec(DecodingSpec), HasJsonEncodingSpec(EncodingSpec)
@@ -60,11 +59,10 @@ import Language.Elm.Pretty (modules)
 import Language.Elm.Type (Type)
 import Network.HTTP.Types (Method)
 import Prelude
-  ( Applicative(pure), Bool(False, True), Eq((==))
-  , Foldable(foldr, length), Functor(fmap), Maybe(Just, Nothing)
-  , Monad((>>=)), Monoid(mconcat, mempty), Semigroup((<>))
-  , Traversable(sequence, traverse), ($), (.), (<$>), IO, Int, String, drop
-  , error, init, putStrLn, reverse, unlines
+  ( Applicative(pure), Bool(False, True), Eq((==)), Foldable(foldr, length)
+  , Functor(fmap), Maybe(Just, Nothing), Monad((>>=)), Monoid(mconcat, mempty)
+  , Semigroup((<>)), Traversable(sequence, traverse), ($), (.), (<$>), IO, Int
+  , String, drop, error, init, putStrLn, reverse, unlines
   )
 import Prettyprinter (defaultLayoutOptions, layoutPretty)
 import Prettyprinter.Render.Text (renderStrict)
@@ -89,7 +87,6 @@ import qualified Language.Elm.Name as Name
 import qualified Language.Elm.Pattern as Pat
 import qualified Language.Elm.Type as Type
 import qualified System.OsPath as OsPath
-
 
 {-|
   This function will traverse the @api@ type, generating elm definitions for:
