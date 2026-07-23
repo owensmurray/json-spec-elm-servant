@@ -12,8 +12,9 @@ import Data.Proxy (Proxy(Proxy))
 import Data.Text (Text)
 import Language.Elm.Name (Module)
 import Language.Elm.Pretty (modules)
-import Prelude (Bool(True), Functor(fmap), Semigroup((<>)), ($), (.),
-  FilePath, IO, init)
+import Prelude
+  ( Bool(True), Functor(fmap), Semigroup((<>)), ($), (.), FilePath, IO, init
+  )
 import Prettyprinter (defaultLayoutOptions, layoutPretty)
 import Prettyprinter.Render.Text (renderStrict)
 import Servant.API (ToServantApi)

@@ -14,30 +14,79 @@ jobs:
           - '9.14'
         cabal-version: ['3.16.1.0']
     steps:
-      # Checkout
-      - uses: actions/checkout@v3
-        
-      # Setup
+      - uses: actions/checkout@v4
+
+      # ------------------------------------------------------------------
+      # TEMPORARY HACKAGE BOOTSTRAP WORKAROUND
+      # ------------------------------------------------------------------
+      # Cause: 2026 root key signing ceremony deployed root.json v8.
+      # cabal 3.16.1.0's baked-in bootstrap keys predate that ceremony, so
+      # a fresh `cabal update` fails TUF checks (then falls through to the
+      # dead dream.io mirror and looks like a 404).
+      #
+      # root-keys below are copied from cabal master's
+      # defaultHackageRemoteRepoKeys (threshold remains 3). Verify them
+      # yourself before trusting this workflow:
+      #
+      #   Cabal master bootstrap keys:
+      #   https://github.com/haskell/cabal/blob/4907eec7b275aa0e1a31333fc745b3cc9f023f4f/cabal-install/src/Distribution/Client/Config.hs#L911-L939
+      #
+      #   Ceremony root.json (roles.root.keyids):
+      #   https://github.com/haskell-infra/hackage-root-keys/blob/d308c26d892ed20d906c4e9435aa70ac9980a872/root.json
+      #
+      #   Ceremony PR:
+      #   https://github.com/haskell-infra/hackage-root-keys/pull/27
+      #
+      # TO REVERT (when a stock `cabal update` works with no custom
+      # root-keys — e.g. a cabal release ships the updated keys):
+      #   1. Delete this entire step in both jobs.
+      #   2. On each "Setup Haskell" step, remove `cabal-update: false`
+      #      (or set it to `true`) and delete the following
+      #      "Cabal update" step.
+      #   Leave all other CI changes in this file alone.
+      # ------------------------------------------------------------------
+      - name: Bootstrap Hackage trust anchors
+        run: |
+          rm -rf ~/.cabal/packages ~/.cache/cabal/packages
+          # Cabal 3.12 uses ~/.cabal; 3.14+ prefers XDG ~/.config/cabal.
+          mkdir -p ~/.cabal ~/.config/cabal
+          tee ~/.cabal/config ~/.config/cabal/config > /dev/null <<'EOF'
+          repository hackage.haskell.org
+            url: https://hackage.haskell.org/
+            secure: True
+            root-keys:
+              fe331502606802feac15e514d9b9ea83fee8b6ffef71335479a2e68d84adc6b0
+              1ea9ba32c526d1cc91ab5e5bd364ec5e9e8cb67179a471872f6e26f0ae773d42
+              0a5c7ea47cd1b15f01f5f51a33adda7e655bc0f0b0615baa8e271f4c3351e21d
+              51f0161b906011b52c6613376b1ae937670da69322113a246a09f807c62f6921
+              d26e46f3b631aae1433b89379a6c68bd417eb5d1c408f0643dcc07757fece522
+              c7de58fc6a224b92b5b513f26fbb8b370f2d97c7cfe0075a951314a55734be93
+            key-threshold: 3
+          EOF
+
       - name: Setup Haskell
         uses: haskell-actions/setup@v2
         id: setup
-        if: steps.tooling-cache.outputs.cache-hit != 'true'
         with:
           ghc-version: ${{ matrix.ghc-version }}
           cabal-version: ${{ matrix.cabal-version }}
+          # Pair with the bootstrap workaround above. Revert notes are
+          # on that step.
+          cabal-update: false
 
-      # Generate Plan
+      - name: Cabal update
+        run: cabal update
+
       - name: Configure the Build
         run: |
-          rm cabal.project.freeze
+          rm -f cabal.project.freeze
           # We can't run tests in this project because testing requires
           # Elm to be installed.
           cabal configure
           cabal build --dry-run
 
-      # Restore cache
       - name: Restore cached dependencies
-        uses: actions/cache/restore@v3
+        uses: actions/cache/restore@v4
         id: cache
         env:
           key: ${{ runner.os }}-ghc-${{ steps.setup.outputs.ghc-version }}-cabal-${{ steps.setup.outputs.cabal-version }}
@@ -45,20 +94,17 @@ jobs:
           path: ${{ steps.setup.outputs.cabal-store }}
           key: ${{ env.key }}-plan-${{ hashFiles('**/plan.json') }}
 
-      # Build deps (for caching)
       - name: Cabal build dependencies
         run: cabal build all --only-dependencies
 
-      # Save dependency cache
       - name: Save cache
-        uses: actions/cache/save@v3
+        uses: actions/cache/save@v4
         if: steps.cache.outputs.cache-hit != 'true'
         with:
           path: ${{ steps.setup.outputs.cabal-store }}
           key: ${{ steps.cache.outputs.cache-primary-key }}
 
-      # Cabal build
-      - name: Cabal Bulid
+      - name: Cabal Build
         run: |
           cabal build all
 
@@ -71,19 +117,54 @@ jobs:
         ghc-version: ['9.8.4']
         cabal-version: ['3.10.2.0']
     steps:
-      # Checkout
-      - uses: actions/checkout@v3
-        
-      # Setup
+      - uses: actions/checkout@v4
+
+      # ------------------------------------------------------------------
+      # TEMPORARY HACKAGE BOOTSTRAP WORKAROUND
+      # ------------------------------------------------------------------
+      # See the matching step in the "build" job for full context and
+      # verification links for the root-keys list.
+      #
+      # TO REVERT (when a stock `cabal update` works with no custom
+      # root-keys — e.g. a cabal release ships the updated keys):
+      #   1. Delete this entire step in both jobs.
+      #   2. On each "Setup Haskell" step, remove `cabal-update: false`
+      #      (or set it to `true`) and delete the following
+      #      "Cabal update" step.
+      #   Leave all other CI changes in this file alone.
+      # ------------------------------------------------------------------
+      - name: Bootstrap Hackage trust anchors
+        run: |
+          rm -rf ~/.cabal/packages ~/.cache/cabal/packages
+          # Cabal 3.12 uses ~/.cabal; 3.14+ prefers XDG ~/.config/cabal.
+          mkdir -p ~/.cabal ~/.config/cabal
+          tee ~/.cabal/config ~/.config/cabal/config > /dev/null <<'EOF'
+          repository hackage.haskell.org
+            url: https://hackage.haskell.org/
+            secure: True
+            root-keys:
+              fe331502606802feac15e514d9b9ea83fee8b6ffef71335479a2e68d84adc6b0
+              1ea9ba32c526d1cc91ab5e5bd364ec5e9e8cb67179a471872f6e26f0ae773d42
+              0a5c7ea47cd1b15f01f5f51a33adda7e655bc0f0b0615baa8e271f4c3351e21d
+              51f0161b906011b52c6613376b1ae937670da69322113a246a09f807c62f6921
+              d26e46f3b631aae1433b89379a6c68bd417eb5d1c408f0643dcc07757fece522
+              c7de58fc6a224b92b5b513f26fbb8b370f2d97c7cfe0075a951314a55734be93
+            key-threshold: 3
+          EOF
+
       - name: Setup Haskell
         uses: haskell-actions/setup@v2
         id: setup
-        if: steps.tooling-cache.outputs.cache-hit != 'true'
         with:
           ghc-version: ${{ matrix.ghc-version }}
           cabal-version: ${{ matrix.cabal-version }}
+          # Pair with the bootstrap workaround above. Revert notes are
+          # on that step.
+          cabal-update: false
 
-      # Generate Plan
+      - name: Cabal update
+        run: cabal update
+
       - name: Configure the Build
         run: |
           (cat << EOF
@@ -101,8 +182,8 @@ jobs:
             filepath == 1.4.200.1,
             hspec == 2.11.1,
             http-types == 0.12.3,
-            json-spec == 1.3.0.0,
-            json-spec-elm == 0.5.0.1,
+            json-spec == 1.4.0.0,
+            json-spec-elm == 0.6.0.0,
             mtl == 2.3.1,
             prettyprinter == 1.7.1,
             process == 1.6.18.0,
@@ -113,16 +194,15 @@ jobs:
             uuid == 1.3.15
           EOF
           ) > cabal.project
-          rm cabal.project.freeze
+          rm -f cabal.project.freeze
           # We can't run tests in this project because testing requires
           # Elm to be installed.
           cat cabal.project
           cabal configure
           cabal build --dry-run
 
-      # Restore cache
       - name: Restore cached dependencies
-        uses: actions/cache/restore@v3
+        uses: actions/cache/restore@v4
         id: cache
         env:
           key: ${{ runner.os }}-ghc-${{ steps.setup.outputs.ghc-version }}-cabal-${{ steps.setup.outputs.cabal-version }}
@@ -130,20 +210,15 @@ jobs:
           path: ${{ steps.setup.outputs.cabal-store }}
           key: ${{ env.key }}-plan-${{ hashFiles('**/plan.json') }}
 
-      # Build deps (for caching)
       - name: Cabal build dependencies
         run: cabal build all --only-dependencies
 
-      # Save dependency cache
       - name: Save cache
-        uses: actions/cache/save@v3
+        uses: actions/cache/save@v4
         if: steps.cache.outputs.cache-hit != 'true'
         with:
           path: ${{ steps.setup.outputs.cabal-store }}
           key: ${{ steps.cache.outputs.cache-primary-key }}
 
-      # Cabal Build
-      - name: Cabal Bulid
+      - name: Cabal Build
         run: cabal build all
-
-
