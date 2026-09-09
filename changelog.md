@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.0.1
+
+- Relaxed the upper bound on `aeson` to allow version 2.3.
+
 ## 0.6.0.0
 
 - Require `json-spec` >= 1.4 and `json-spec-elm` >= 0.6, which provide
