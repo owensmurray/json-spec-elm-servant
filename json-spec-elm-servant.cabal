@@ -73,7 +73,7 @@ test-suite compile-elm
     Api
   build-depends:
     , json-spec-elm-servant
-    , aeson                >= 2.2.1.0  && < 2.3
+    , aeson                >= 2.2.1.0  && < 2.4
     , binary               >= 0.8.9.1  && < 0.9
     , bytestring           >= 0.12.0.2 && < 0.13
     , cookie               >= 0.4.6    && < 0.6
