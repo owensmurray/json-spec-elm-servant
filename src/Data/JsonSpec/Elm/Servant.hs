@@ -43,6 +43,7 @@ import Data.Foldable (Foldable(fold, foldl'), traverse_)
 import Data.HashMap.Strict (HashMap)
 import Data.JsonSpec
   ( HasJsonDecodingSpec(DecodingSpec), HasJsonEncodingSpec(EncodingSpec)
+  , Specification(JsonModule)
   )
 import Data.JsonSpec.Elm (HasType(decoderOf, encoderOf, typeOf), Definitions)
 import Data.Maybe (fromJust, fromMaybe, mapMaybe)
@@ -393,15 +394,15 @@ instance {- Elmable (Verb m c t NoContent) -}
     endpoints = endpoints @(NoContentVerb m)
 instance {- Elmable (Verb method code types response) -}
     {-# overlaps #-}
-    ( HasType (EncodingSpec response)
+    ( HasType (JsonModule (EncodingSpec response))
     , ReflectMethod method
     )
   =>
     Elmable (Verb method code types response)
   where
     endpoints (reverse -> params) = do
-      responseType <- typeOf @(EncodingSpec response)
-      decoder <- decoderOf @(EncodingSpec response)
+      responseType <- typeOf @(JsonModule (EncodingSpec response))
+      decoder <- decoderOf @(JsonModule (EncodingSpec response))
       tell . Set.singleton $
         Def.Constant
           (requestFunctionName @method params)
@@ -459,13 +460,13 @@ instance {- IsParam (Header' (other : mods) name a) -}
   where
     param = param @(Header' mods name a)
 instance {- IsParam (ReqBody' (Required : mods) (JSON : accept) a) -}
-    (HasType (DecodingSpec a))
+    (HasType (JsonModule (DecodingSpec a)))
   =>
     IsParam (ReqBody' (Required : mods) (JSON : accept) a)
   where
     param = do
-      elmType <- typeOf @(DecodingSpec a)
-      encoder <- encoderOf @(DecodingSpec a)
+      elmType <- typeOf @(JsonModule (DecodingSpec a))
+      encoder <- encoderOf @(JsonModule (DecodingSpec a))
       pure $ BodyEncoder {elmType, encoder}
 instance {- IsParam (ReqBody' (other : mods) (JSON : accept) a) -}
     {-# overlaps #-} (IsParam (ReqBody' (other : mods) accept a))

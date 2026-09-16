@@ -5,4 +5,4 @@ package json-spec-elm-servant
     -Werror
 
 
-allow-newer: base, template-haskell
+-- allow-newer: base, template-haskell
