@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.0.0.0
+
+- Require `json-spec` >= 2.0 and adapt to its 2.0 API (`'Module` /
+  `JsonModule`, `SpecJson`, `TupleDecoding`, and `TupleEncoding`).
+- The major (epoch) version is bumped to 2.0 to indicate compatibility
+  with the `json-spec` 2.0 major/epoch version.
+
 ## 0.6.0.1
 
 - Relaxed the upper bound on `aeson` to allow version 2.3.

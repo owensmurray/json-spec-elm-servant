@@ -44,18 +44,24 @@ module Api (
   SetMetadataReq(..),
   KV(..),
   FEConfig(..),
+  Guilds(..),
 ) where
 
 import Data.Aeson (FromJSON, FromJSONKey, ToJSON, ToJSONKey)
 import Data.Binary (Binary)
 import Data.ByteString (ByteString)
 import Data.JsonSpec
-  ( Field(Field), HasJsonDecodingSpec(DecodingSpec, fromJSONStructure)
-  , HasJsonEncodingSpec(EncodingSpec, toJSONStructure), SpecJSON(SpecJSON)
+  ( HasJsonDecodingSpec(DecodingSpec), HasJsonEncodingSpec(EncodingSpec)
+  , Module(Module)
   , Specification
     ( JsonArray, JsonDateTime, JsonDict, JsonEither, JsonInt, JsonLet
-    , JsonObject, JsonRef, JsonString, JsonTag
+    , JsonModule, JsonObject, JsonRef, JsonString, JsonTag
     )
+  , type (:::), type (::?), type (:=)
+  )
+import Data.JsonSpec.Codec.Tuple
+  ( Field(Field), SpecJson(SpecJson), TupleDecoding(fromJsonStructure)
+  , TupleEncoding(toJsonStructure)
   )
 import Data.Map (Map)
 import Data.Set (Set)
@@ -75,7 +81,6 @@ import Servant.API
   , Verb
   )
 import Web.Cookie (SetCookie)
-import qualified Data.JsonSpec as Spec
 
 data Api mode = Api
   { protectedApi :: mode
@@ -146,10 +151,21 @@ data ProtectedApi mode = ProtectedApi
 
   , getGuilds :: mode
       :- "guilds"
-      :> Get '[JSON] (Set Guild)
+      :> Get '[JSON] Guilds
 
   }
   deriving stock (Generic)
+
+
+newtype Guilds = Guilds
+  { unGuilds :: Set Guild
+  }
+  deriving ToJSON via (SpecJson Guilds)
+instance HasJsonEncodingSpec Guilds where
+  type EncodingSpec Guilds =
+    'Module (JsonArray (JsonModule (EncodingSpec Guild)))
+instance TupleEncoding Guilds where
+  toJsonStructure = undefined
 
 
 data SetMetadataReq = SetMetadataReq
@@ -157,21 +173,23 @@ data SetMetadataReq = SetMetadataReq
   , description :: Text
   ,       venue :: Text
   }
-  deriving FromJSON via (SpecJSON SetMetadataReq)
+  deriving FromJSON via (SpecJson SetMetadataReq)
 instance HasJsonDecodingSpec SetMetadataReq where
   type DecodingSpec SetMetadataReq =
-    JsonObject
-      '[        "name" ::: (DecodingSpec Name)
-       , "description" ::: JsonString
-       ,       "venue" ::: JsonString
-       ]
-  fromJSONStructure
+    'Module
+      (JsonObject
+        '[        "name" ::: JsonModule (DecodingSpec Name)
+         , "description" ::: JsonString
+         ,       "venue" ::: JsonString
+         ])
+instance TupleDecoding SetMetadataReq where
+  fromJsonStructure
       (Field @"name" name_,
       (Field @"description" description,
       (Field @"venue" venue,
       ())))
     = do
-      name <- fromJSONStructure name_
+      name <- fromJsonStructure name_
       pure
         SetMetadataReq
           { name
@@ -185,20 +203,21 @@ data DashboardData = DashboardData
   ,   credits :: AvailableCredits
   ,      user :: DiscordUser
   }
-  deriving ToJSON via (SpecJSON DashboardData)
+  deriving ToJSON via (SpecJson DashboardData)
 instance HasJsonEncodingSpec DashboardData where
   type EncodingSpec DashboardData =
-    JsonLet
-      '[ '("DashboardData"
-          , JsonObject
-              '[ "proposals" ::: JsonDict (EncodingSpec Proposal)
-               , "credits" ::: EncodingSpec AvailableCredits
-               , "user" ::: EncodingSpec DiscordUser
-               ]
-          )
-       ]
-       (JsonRef "DashboardData")
-  toJSONStructure = undefined
+    'Module
+      (JsonLet
+        '[ "DashboardData" :=
+             JsonObject
+               '[ "proposals" ::: JsonDict (JsonModule (EncodingSpec Proposal))
+                , "credits" ::: JsonModule (EncodingSpec AvailableCredits)
+                , "user" ::: JsonModule (EncodingSpec DiscordUser)
+                ]
+         ]
+        (JsonRef "DashboardData"))
+instance TupleEncoding DashboardData where
+  toJsonStructure = undefined
 
 
 data Proposal = Proposal
@@ -211,50 +230,55 @@ data Proposal = Proposal
   ,    createdAt :: UTCTime
   }
   deriving stock (Generic)
-  deriving (ToJSON, FromJSON) via (SpecJSON Proposal)
+  deriving (ToJSON, FromJSON) via (SpecJson Proposal)
 instance HasJsonEncodingSpec Proposal where
   type EncodingSpec Proposal =
-    JsonObject
-      '[         "name" ::: EncodingSpec Name
-       ,        "owner" ::: EncodingSpec DiscordUser
-       , "availability" ::: JsonArray (EncodingSpec AvailabilityInterval)
-       ,  "description" ::: JsonString
-       ,        "venue" ::: JsonString
-       ,      "invites" ::: JsonArray (EncodingSpec Invite)
-       ,   "created-at" ::: JsonDateTime
-       ]
-  toJSONStructure = undefined
+    'Module
+      (JsonObject
+        '[         "name" ::: JsonModule (EncodingSpec Name)
+         ,        "owner" ::: JsonModule (EncodingSpec DiscordUser)
+         , "availability" ::: JsonArray (JsonModule (EncodingSpec AvailabilityInterval))
+         ,  "description" ::: JsonString
+         ,        "venue" ::: JsonString
+         ,      "invites" ::: JsonArray (JsonModule (EncodingSpec Invite))
+         ,   "created-at" ::: JsonDateTime
+         ])
+instance TupleEncoding Proposal where
+  toJsonStructure = undefined
 instance HasJsonDecodingSpec Proposal where
   type DecodingSpec Proposal = EncodingSpec Proposal
-  fromJSONStructure = undefined
+instance TupleDecoding Proposal where
+  fromJsonStructure = undefined
 
 
 data Invite
   = InviteUser DiscordUser
   | InviteGuild Guild
   deriving stock (Eq, Ord)
-  deriving (ToJSON, FromJSON) via (SpecJSON Invite)
+  deriving (ToJSON, FromJSON) via (SpecJson Invite)
 instance HasJsonEncodingSpec Invite where
   type EncodingSpec Invite =
-    JsonLet
-      '[ '( "Invite"
-          , JsonEither
-              '[ JsonObject
+    'Module
+      (JsonLet
+        '[ "Invite" :=
+             JsonEither
+               '[ JsonObject
                     '[     "type" ::: JsonTag "discord-user"
-                     , "username" ::: EncodingSpec DiscordUser
+                     , "username" ::: JsonModule (EncodingSpec DiscordUser)
                      ]
                 , JsonObject
                     '[  "type" ::: JsonTag "discord-server"
-                     , "guild" ::: EncodingSpec Guild
+                     , "guild" ::: JsonModule (EncodingSpec Guild)
                      ]
                 ]
-          )
-       ]
-       (JsonRef "Invite")
-  toJSONStructure = undefined
+         ]
+        (JsonRef "Invite"))
+instance TupleEncoding Invite where
+  toJsonStructure = undefined
 instance HasJsonDecodingSpec Invite where
   type DecodingSpec Invite = EncodingSpec Invite
-  fromJSONStructure = undefined
+instance TupleDecoding Invite where
+  fromJsonStructure = undefined
 
 
 data Guild = Guild
@@ -262,56 +286,65 @@ data Guild = Guild
   ,    name :: Text
   }
   deriving stock (Eq, Ord)
-  deriving (ToJSON, FromJSON) via (SpecJSON Guild)
+  deriving (ToJSON, FromJSON) via (SpecJson Guild)
 instance HasJsonEncodingSpec Guild where
   type EncodingSpec Guild =
-    JsonObject
-      '[   "id" ::: EncodingSpec GuildId
-       , "name" ::: JsonString
-       ]
-  toJSONStructure = undefined
+    'Module
+      (JsonObject
+        '[   "id" ::: JsonModule (EncodingSpec GuildId)
+         , "name" ::: JsonString
+         ])
+instance TupleEncoding Guild where
+  toJsonStructure = undefined
 instance HasJsonDecodingSpec Guild where
   type DecodingSpec Guild = EncodingSpec Guild
-  fromJSONStructure = undefined
+instance TupleDecoding Guild where
+  fromJsonStructure = undefined
 
 
 newtype GuildId = GuildId
   { unGuildId :: Text
   }
   deriving newtype (ToHttpApiData, Eq, Ord)
-  deriving FromJSON via (SpecJSON GuildId)
+  deriving FromJSON via (SpecJson GuildId)
 instance HasJsonEncodingSpec GuildId where
-  type EncodingSpec GuildId = JsonString
-  toJSONStructure = unGuildId
+  type EncodingSpec GuildId = 'Module JsonString
+instance TupleEncoding GuildId where
+  toJsonStructure = unGuildId
 instance HasJsonDecodingSpec GuildId where
   type DecodingSpec GuildId = EncodingSpec GuildId
-  fromJSONStructure = pure . GuildId
+instance TupleDecoding GuildId where
+  fromJsonStructure = pure . GuildId
 
 
 data AvailabilityInterval = AvailabilityInterval
   { interval :: Interval
   ,    users :: Set DiscordUser
   }
-  deriving ToJSON via (SpecJSON AvailabilityInterval)
+  deriving ToJSON via (SpecJson AvailabilityInterval)
 instance HasJsonDecodingSpec AvailabilityInterval where
   type DecodingSpec AvailabilityInterval = EncodingSpec AvailabilityInterval
-  fromJSONStructure = undefined
+instance TupleDecoding AvailabilityInterval where
+  fromJsonStructure = undefined
 instance HasJsonEncodingSpec AvailabilityInterval where
   type EncodingSpec AvailabilityInterval =
-    JsonObject
-      '[ "interval" ::: EncodingSpec Interval
-       ,    "users" ::: JsonArray (EncodingSpec DiscordUser)
-       ]
-  toJSONStructure = undefined
+    'Module
+      (JsonObject
+        '[ "interval" ::: JsonModule (EncodingSpec Interval)
+         ,    "users" ::: JsonArray (JsonModule (EncodingSpec DiscordUser))
+         ])
+instance TupleEncoding AvailabilityInterval where
+  toJsonStructure = undefined
 
 
 newtype AvailableCredits = AvailableCredits
   { unAvailableCredits :: Int
   }
-  deriving ToJSON via (SpecJSON AvailableCredits)
+  deriving ToJSON via (SpecJson AvailableCredits)
 instance HasJsonEncodingSpec AvailableCredits where
-  type EncodingSpec AvailableCredits = JsonInt
-  toJSONStructure = undefined
+  type EncodingSpec AvailableCredits = 'Module JsonInt
+instance TupleEncoding AvailableCredits where
+  toJsonStructure = undefined
 
 
 data UnprotectedApi mode = UnprotectedApi
@@ -347,12 +380,14 @@ data UnprotectedApi mode = UnprotectedApi
 newtype FEConfig = FEConfig
   { discordRedirect :: Text
   }
-  deriving (ToJSON) via (SpecJSON FEConfig)
+  deriving (ToJSON) via (SpecJson FEConfig)
 instance HasJsonEncodingSpec FEConfig where
   type EncodingSpec FEConfig =
-    JsonObject
-      '[ "redirectUrl" ::: JsonString ]
-  toJSONStructure = undefined
+    'Module
+      (JsonObject
+        '[ "redirectUrl" ::: JsonString ])
+instance TupleEncoding FEConfig where
+  toJsonStructure = undefined
 
 newtype Email = Email
   { unEmail :: Text
@@ -364,10 +399,11 @@ newtype DiscordAccessToken = DiscordAccessToken
   { unDiscordAccessToken :: Text
   }
   deriving newtype (Binary)
-  deriving (FromJSON) via (SpecJSON DiscordAccessToken)
+  deriving (FromJSON) via (SpecJson DiscordAccessToken)
 instance HasJsonDecodingSpec DiscordAccessToken where
-  type DecodingSpec DiscordAccessToken = JsonString
-  fromJSONStructure = undefined
+  type DecodingSpec DiscordAccessToken = 'Module JsonString
+instance TupleDecoding DiscordAccessToken where
+  fromJsonStructure = undefined
 
 
 newtype Token = Token
@@ -390,10 +426,11 @@ newtype ProposalId = ProposalId
     , ToJSONKey
     , FromJSONKey
     )
-  deriving ToJSON via (SpecJSON ProposalId)
+  deriving ToJSON via (SpecJson ProposalId)
 instance HasJsonEncodingSpec ProposalId where
-  type EncodingSpec ProposalId = JsonString
-  toJSONStructure = undefined
+  type EncodingSpec ProposalId = 'Module JsonString
+instance TupleEncoding ProposalId where
+  toJsonStructure = undefined
 
 
 data NewProposalReq = NewProposalReq
@@ -402,37 +439,43 @@ data NewProposalReq = NewProposalReq
   ,  description :: Text
   ,        venue :: Maybe Text
   }
-  deriving (FromJSON) via (SpecJSON NewProposalReq)
+  deriving (FromJSON) via (SpecJson NewProposalReq)
 instance HasJsonDecodingSpec NewProposalReq where
   type DecodingSpec NewProposalReq =
-    JsonObject
-      '[         "name" ::: DecodingSpec Name
-       , "availability" ::: DecodingSpec Availability
-       ,  "description" ::: JsonString
-       ,        "venue" ::? JsonString
-       ]
-  fromJSONStructure = undefined
+    'Module
+      (JsonObject
+        '[         "name" ::: JsonModule (DecodingSpec Name)
+         , "availability" ::: JsonModule (DecodingSpec Availability)
+         ,  "description" ::: JsonString
+         ,        "venue" ::? JsonString
+         ])
+instance TupleDecoding NewProposalReq where
+  fromJsonStructure = undefined
 
 
 newtype Availability = Availability
   { unAvailability :: Set Interval
   }
-  deriving FromJSON via (SpecJSON Availability)
+  deriving FromJSON via (SpecJson Availability)
 instance HasJsonDecodingSpec Availability where
-  type DecodingSpec Availability = JsonArray (DecodingSpec Interval)
-  fromJSONStructure = undefined
+  type DecodingSpec Availability =
+    'Module (JsonArray (JsonModule (DecodingSpec Interval)))
+instance TupleDecoding Availability where
+  fromJsonStructure = undefined
 
 
 newtype Name = Name
   { unName :: Text
   }
-  deriving (ToJSON, FromJSON) via (SpecJSON Name)
+  deriving (ToJSON, FromJSON) via (SpecJson Name)
 instance HasJsonEncodingSpec Name where
-  type EncodingSpec Name = JsonString
-  toJSONStructure = undefined
+  type EncodingSpec Name = 'Module JsonString
+instance TupleEncoding Name where
+  toJsonStructure = undefined
 instance HasJsonDecodingSpec Name where
   type DecodingSpec Name = EncodingSpec Name
-  fromJSONStructure = undefined
+instance TupleDecoding Name where
+  fromJsonStructure = undefined
 
 
 data Interval = Interval
@@ -440,49 +483,49 @@ data Interval = Interval
   ,   endExclusive :: UTCTime
   }
   deriving stock (Eq, Ord)
-  deriving (ToJSON, FromJSON) via (SpecJSON Interval)
+  deriving (ToJSON, FromJSON) via (SpecJson Interval)
 instance HasJsonEncodingSpec Interval where
   type EncodingSpec Interval =
-    JsonObject
-      '[ "startInclusive" ::: JsonDateTime
-       ,   "endExclusive" ::: JsonDateTime
-       ]
-  toJSONStructure = undefined
+    'Module
+      (JsonObject
+        '[ "startInclusive" ::: JsonDateTime
+         ,   "endExclusive" ::: JsonDateTime
+         ])
+instance TupleEncoding Interval where
+  toJsonStructure = undefined
 instance HasJsonDecodingSpec Interval where
   type DecodingSpec Interval = EncodingSpec Interval
-  fromJSONStructure = undefined
+instance TupleDecoding Interval where
+  fromJsonStructure = undefined
 
 
 newtype DiscordUser = DiscordUser
   { unDiscordUser :: Text
   }
   deriving newtype ( Eq , FromJSON , Ord, Binary)
-  deriving ToJSON via (SpecJSON DiscordUser)
+  deriving ToJSON via (SpecJson DiscordUser)
 instance HasJsonEncodingSpec DiscordUser where
-  type EncodingSpec DiscordUser = JsonString
-  toJSONStructure = undefined
+  type EncodingSpec DiscordUser = 'Module JsonString
+instance TupleEncoding DiscordUser where
+  toJsonStructure = undefined
 instance HasJsonDecodingSpec DiscordUser where
   type DecodingSpec DiscordUser = EncodingSpec DiscordUser
-  fromJSONStructure = undefined
+instance TupleDecoding DiscordUser where
+  fromJsonStructure = undefined
 
 
 data KV k v = KV
   {   key :: k
   , value :: v
   }
-deriving via (SpecJSON (KV ProposalId Proposal)) instance
+deriving via (SpecJson (KV ProposalId Proposal)) instance
   ToJSON (KV ProposalId Proposal)
 instance HasJsonEncodingSpec (KV k v) where
-    type EncodingSpec (KV k v) =
-      JsonObject
-        '[   "key" ::: EncodingSpec k
-         , "value" ::: EncodingSpec v
-         ]
-
-    toJSONStructure = undefined
-
-
-type (:::) = Spec.Required
-type (::?) = Spec.Optional
-
-
+  type EncodingSpec (KV k v) =
+    'Module
+      (JsonObject
+        '[   "key" ::: JsonModule (EncodingSpec k)
+         , "value" ::: JsonModule (EncodingSpec v)
+         ])
+instance TupleEncoding (KV k v) where
+  toJsonStructure = undefined
